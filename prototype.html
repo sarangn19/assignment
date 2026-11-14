@@ -318,7 +318,7 @@ function drawerHtml(i){
    <div class="drawer-kv"><span>Title</span><b>${esc(i.title)}</b></div>
    <div class="drawer-kv"><span>Expected behaviour</span><span>${esc(i.expected||"Not supplied")}</span></div>
    <div class="drawer-kv"><span>Actual behaviour</span><span>${esc(i.actual||"Not supplied")}</span></div>
-   <div class="drawer-kv"><span>Call ID</span><span>${i.call?(cl?`<button class="link" data-act="openCall" data-arg="${i.call}">${i.call}</button>`:`${esc(i.call)} <small class="muted">(transcript not supplied)</small>`):'<span class="tag t-warn">No Call ID</span>'}</span></div>
+   <div class="drawer-kv"><span>Call ID</span><span>${i.call?(cl?`<button class="link" data-act="openCall" data-arg="${i.call}">${i.call}</button>`:`${esc(i.call)} <small class="muted">(transcript not supplied)</small>`):`<span class="tag t-warn">No Call ID</span> <select onchange="setCall('${i.id}',this.value)"><option value="">Link a call…</option>${[...Object.keys(CALLS),...SHEET_ONLY].map(c=>`<option>${c}</option>`).join("")}</select>`}</span></div>
    <div class="drawer-kv"><span>Reporter</span><b>${esc(i.reporter)}</b></div>
    <div class="drawer-kv"><span>Owner</span><b>${i.owner?esc(i.owner):'Unassigned'}</b></div>
    <div class="drawer-kv"><span>Severity (source)</span><b>${esc(i.severity||"Not supplied")}</b></div>
@@ -339,10 +339,6 @@ function drawerHtml(i){
    ${exportHandoffHtml(i)}
    <div style="margin-top:8px"><button class="btn soft" data-act="recordVendorResponse" data-arg="${i.id}">Record vendor response</button></div>
    ${i.vendorResponse?'<div class="drawer-kv"><span>Vendor response</span><b>'+esc(i.vendorResponse.status)+'</b></div><div class="drawer-kv"><span>Build version</span><b>'+esc(i.vendorResponse.build||"Not supplied")+'</b></div><div class="drawer-kv"><span>Vendor comments</span><span>'+esc(i.vendorResponse.comments||"Not supplied")+'</span></div><div class="drawer-kv"><span>Updated by</span><b>'+esc(i.vendorResponse.updatedBy)+' - '+esc(i.vendorResponse.updatedAt)+'</b></div>':''}</div>
-  <div class="drawer-section"><h3>Export handoff</h3>
-   ${exportHandoffHtml(i)}
-   <div style="margin-top:8px"><button class="btn soft" data-act="recordVendorResponse" data-arg="${i.id}">Record vendor response</button></div>
-   ${i.vendorResponse?'<div class="drawer-kv"><span>Vendor response</span><b>'+esc(i.vendorResponse.status)+'</b></div><div class="drawer-kv"><span>Build version</span><b>'+esc(i.vendorResponse.build||"Not supplied")+'</b></div><div class="drawer-kv"><span>Vendor comments</span><span>'+esc(i.vendorResponse.comments||"Not supplied")+'</span></div><div class="drawer-kv"><span>Updated by</span><b>'+esc(i.vendorResponse.updatedBy)+' · '+esc(i.vendorResponse.updatedAt)+'</b></div>':''}</div>
   <div class="drawer-section"><h3>Retesting</h3>
    <div class="drawer-kv"><span>Assigned tester</span><b>${esc(i.assign||"Unassigned")}</b></div>
    <div class="drawer-kv"><span>Retest status</span><b>${rtStatus}</b></div>
@@ -447,7 +443,7 @@ const CATS=["Date accuracy","Payment handling","Voice quality","Conversation flo
 function reportModal(call,pre){
  if(!need(isTester(),"a tester or Priya"))return;
  const lines=pre?pre.lines:S.sel;
- modal("Report an issue",`<div class="form"><label>Linked Call ID<select id="rc" onchange="similar()"><option value="">Select Call ID…</option>${[...Object.keys(CALLS),...SHEET_ONLY].map(c=>`<option ${c===call?"selected":""}>${c}</option>`).join("")}</select></label>
+ modal("Report an issue",`<div class="form"><label>Linked Call ID *<select id="rc" onchange="similar()" required><option value="">Select Call ID…</option>${[...Object.keys(CALLS),...SHEET_ONLY].map(c=>`<option ${c===call?"selected":""}>${c}</option>`).join("")}</select></label>
  <label>Category<select id="rg" onchange="similar()">${CATS.map(c=>`<option>${c}</option>`).join("")}</select></label>
  <label class="full">Evidence lines<input id="rl" value="${esc(lines.join(", "))}" placeholder="Select lines in the transcript first (optional)"></label>
  <label class="full">Title *<input id="rt" value="${esc(pre?pre.title:"")}"></label>
@@ -461,9 +457,11 @@ function similar(){const c=$("#rc").value,g=$("#rg").value,s=canon().filter(i=>i
 let ISSUE_SAVING=false;
 function saveIssue(){
  if(ISSUE_SAVING)return;
- const t=$("#rt").value.trim(),a=$("#ra2").value.trim();if(!t||!a){$("#merr").textContent="Title and actual behaviour are required.";return}
+ const t=$("#rt").value.trim(),a=$("#ra2").value.trim(),call=$("#rc").value;
+ if(!t||!a){$("#merr").textContent="Title and actual behaviour are required.";return}
+ if(!call){$("#merr").textContent="Please select the call associated with this issue.";$("#rc").focus();return}
  ISSUE_SAVING=true;const btn=document.querySelector('#mfoot .btn.primary');if(btn)btn.disabled=true;
- const call=$("#rc").value,sv=$("#rv2").value,miss=[];if(!call)miss.push("Call ID");if(!sv)miss.push("Severity");
+ const sv=$("#rv2").value,miss=[];if(!sv)miss.push("Severity");
  const id="F"+String(Math.max(...ISSUES.map(i=>+i.id.slice(1)))+1).padStart(2,"0"),cat=$("#rg").value,parent=$("#rd").value;
  const i=mk(id,"New",S.actor,call,t,sv,"—",miss.length?"Needs information":"Open",cat,[[S.actor,"Reported. Evidence lines: "+($("#rl").value||"none")+". Expected: "+($("#rx").value||"not stated")+". Actual: "+a]],[],miss);
  i.expected=$("#rx").value.trim();i.actual=a;i.evidenceLines=($("#rl").value||"").split(",").map(s=>s.trim()).filter(Boolean);i.sheetUnverified=false;
