@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Northstar Life — UAT Workspace</title>
+<style>
+:root{--ink:#172b4d;--blue:#315efb;--muted:#667085;--line:#e7eaf0;--bg:#f6f7fb;--green:#448361;--red:#d44c47;--amber:#9a6700;--orange:#d9730d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.5 Inter,system-ui,Arial,sans-serif;color:#202b3c}
+button,select,input,textarea{font:inherit}p{margin:0}h1{font-size:24px;margin:0 0 4px;color:var(--ink)}h2{font-size:15px;margin:0;color:var(--ink)}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.side{background:#fff;border-right:1px solid var(--line);padding:22px 14px;display:flex;flex-direction:column;gap:22px}
+.brand{font-size:16px;font-weight:800;color:var(--ink);padding:0 8px}.mark{display:inline-grid;place-items:center;background:var(--blue);color:#fff;border-radius:8px;width:28px;height:28px;margin-right:8px}
+.nav{display:grid;gap:4px}.nav button{border:0;background:#fff;text-align:left;padding:10px 11px;border-radius:9px;color:#536078;cursor:pointer;display:flex;justify-content:space-between}
+.nav button small{color:#98a2b3}.nav button.active{background:#eef2ff;color:var(--blue);font-weight:700}
+.side-note{margin-top:auto;background:#f7f8fc;border:1px solid var(--line);padding:12px;border-radius:12px;color:var(--muted);font-size:12px}
+.top{height:60px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;color:var(--muted);gap:12px}
+.who{display:flex;align-items:center;gap:8px;font-size:12px}.who select{border:1px solid #dfe3eb;border-radius:8px;padding:6px 8px;background:#fff}
+main{min-width:0;position:relative}.content{max-width:1300px;margin:auto;padding:26px 28px 60px}
+.sid{position:fixed;right:12px;bottom:12px;background:var(--ink);color:#fff;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;z-index:20;opacity:.92}
+.head{display:flex;justify-content:space-between;gap:14px;margin-bottom:18px;align-items:flex-start;flex-wrap:wrap}.sub,.muted{color:var(--muted)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 12px;cursor:pointer;color:#344054;font-weight:600}.btn:hover{background:#f8f9fc}
+.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.btn.soft{background:#eef2ff;color:var(--blue);border-color:transparent}.btn.danger{color:var(--red);border-color:#f4c9c2}
+.btn[disabled],.btn.off{opacity:.45;cursor:not-allowed}
+.link{border:0;background:none;color:var(--blue);font-weight:650;cursor:pointer;padding:0;text-align:left}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat,.panel{background:#fff;border:1px solid var(--line);border-radius:13px;padding:16px}.panel{margin-bottom:14px}
+.stat small{color:var(--muted)}.stat strong{display:block;font-size:28px;color:var(--ink);margin:4px 0}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}.cols{display:grid;grid-template-columns:1.15fr 1fr;gap:14px}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}
+.row{padding:9px 0;border-bottom:1px solid #f0f1f4;display:flex;justify-content:space-between;gap:12px;align-items:center}.row:last-child{border:0}
+.tag{font-size:11px;padding:3px 8px;border-radius:20px;background:#f1f1ef;color:#787774;white-space:nowrap;display:inline-block}
+.t-open{background:#f1f1ef;color:#787774}.t-needs-information{background:#fcecc9;color:#9a6700}.t-retest-required{background:#fce8d5;color:#d9730d}
+.t-open-fix-needed{background:#ffe2dd;color:#d44c47}.t-verified{background:#dbeddb;color:#448361}.t-closed-with-reason{background:#e8e5f5;color:#6940a5}
+.t-warn{background:#fcecc9;color:#9a6700}.t-bad{background:#ffe2dd;color:#d44c47}.t-ok{background:#dbeddb;color:#448361}.t-blue{background:#eef2ff;color:var(--blue)}
+.flag{background:#fffaf0;border:1px solid #f3dfb0;color:#7a5200;border-radius:9px;padding:8px 10px;font-size:12.5px;margin:8px 0}
+.flag.bad{background:#fff5f4;border-color:#f4c9c2;color:#a3322d}.flag.ok{background:#f1f9f3;border-color:#c7e2c7;color:#2f6a49}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:11px}
+table{width:100%;border-collapse:collapse;min-width:640px}th{text-align:left;background:#fafbfc;color:var(--muted);font-size:11px;text-transform:uppercase;padding:10px 12px}td{padding:10px 12px;border-top:1px solid #eef0f4;vertical-align:top}
+tr.sel td{background:#f5f8ff}tr.dim td{color:#98a2b3}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.field{border:1px solid #dfe3eb;border-radius:9px;padding:8px 10px;background:#fff;min-width:140px}
+.line{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:7px 0;cursor:pointer;display:flex;gap:10px}.line:hover{background:#fafbff}
+.line.picked{border-color:var(--blue);background:#eef2ff}.line b{font-size:11px;color:var(--blue);min-width:56px}.line i{font-style:normal;font-size:11px;color:var(--muted);display:block}
+.kv{display:grid;grid-template-columns:150px 1fr;padding:8px 0;border-bottom:1px solid #f0f1f4;gap:8px}.kv span:first-child{color:var(--muted)}
+.cmp{border:1px solid var(--line);border-radius:11px;padding:11px;margin:9px 0}.cmp.mm{border-color:#f1c5ca;background:#fffafb}.cmp.okc{border-color:#c7e2c7;background:#f8fcf9}
+.cmp q{display:block;color:#475467;font-size:12.5px;margin:3px 0;quotes:none}.cmp .sv{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:#f6f7fb;padding:2px 6px;border-radius:5px}
+.hist{border-left:2px solid var(--line);padding-left:14px;margin:8px 0}.hist b{font-size:12px;color:var(--ink)}.hist p{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.modalbg{display:none;position:fixed;inset:0;background:#10182866;align-items:center;justify-content:center;padding:14px;z-index:30}.modalbg.show{display:flex}
+.modal{background:#fff;width:min(640px,100%);border-radius:15px;max-height:92vh;overflow:auto}.mh,.mf{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.mf{border:0;border-top:1px solid var(--line);justify-content:flex-end;gap:8px}.mb{padding:18px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:11px}.form label{display:grid;gap:4px;font-size:12px;font-weight:650}.form .full{grid-column:1/-1}
+.form input,.form select,.form textarea{width:100%;padding:9px;border:1px solid #dfe3eb;border-radius:8px}.form textarea{min-height:74px}
+.err{color:var(--red);font-size:12.5px;margin-top:8px;font-weight:600}
+.toast{position:fixed;bottom:56px;right:14px;background:var(--ink);color:#fff;padding:11px 15px;border-radius:9px;display:none;z-index:40;max-width:340px}.toast.show{display:block}
+.empty{border:1px dashed #d0d5dd;border-radius:11px;padding:18px;text-align:center;color:var(--muted)}
+.selbar{position:sticky;bottom:0;background:#fff;border:1px solid var(--blue);border-radius:11px;padding:9px 12px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+@media(max-width:900px){.app{grid-template-columns:1fr}.side{flex-direction:row;flex-wrap:wrap;padding:10px}.side-note{display:none}.nav{display:flex;flex-wrap:wrap}.grid,.cols{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.top{padding:0 14px}.content{padding:18px 14px 60px}}
+@media(max-width:560px){.form{grid-template-columns:1fr}.kv{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app">
+<aside class="side"><div class="brand"><span class="mark">N</span>Northstar Life</div>
+<div><p class="muted" style="font-size:11px;margin:0 10px 8px">UAT WORKSPACE</p><nav class="nav" id="nav"></nav></div>
+<div class="side-note"><b>Asha · renewal voice agent</b><br>Review a test call, report an issue, track it, re-test the fix, sign it off.</div></aside>
+<main><header class="top"><span id="crumb"></span><span class="who">Acting as <select id="actor" onchange="setActor(this.value)"></select></span></header>
+<div class="content" id="content"></div><div class="sid" id="sid"></div></main></div>
+<div class="modalbg" id="mbg"><div class="modal"><div class="mh"><b id="mt"></b><button class="btn" data-act="closeModal">✕</button></div><div class="mb" id="mbody"></div><div class="mf" id="mfoot"></div></div></div>
+<div class="toast" id="toast"></div>
+<script>
+/* ===== Source data: copied from the starter pack (Appendices B, C, D) ===== */
+const CALLS={
+"UAT-0142":{id:"UAT-0142",date:"2 Nov 2026",tester:"Sameer Khan",customer:"Arun Verma",lang:"English",
+ lines:[["T1-01","Asha","Good morning, am I speaking with Mr. Arun Verma?"],["T1-02","Customer","Yes, speaking."],["T1-03","Asha","This is Asha calling from Northstar Life Insurance. This call is recorded for quality purposes. I'm calling about your policy ending 4471. Your renewal premium of ₹24,500 is due on March 5th."],["T1-04","Customer","March? I thought it was May."],["T1-05","Asha","I understand. As per our records the due date is March 5th, 2026. Would you like to pay now through a secure link?"],["T1-06","Customer","No, no. My policy document says 3rd May."],["T1-07","Asha","I apologise for the confusion. I will note your concern. Is there anything else I can help with?"],["T1-08","Customer","Is there a grace period if I'm late?"],["T1-09","Asha","Yes. There is a grace period of 30 days after the due date, during which your cover continues."],["T1-10","Customer","Okay. Send me the link, I'll check."],["T1-11","Asha","I've sent the payment link to your registered mobile number. Thank you for your time."]],
+ post:{disposition:"Payment link sent – Follow-up",due_date:"03/05/2026",callback:"No"},
+ cmp:[{f:"due_date",label:"Due date",val:"03/05/2026",ls:["T1-03","T1-05","T1-06"]},{f:"disposition",label:"Disposition",val:"Payment link sent – Follow-up",ls:["T1-10","T1-11"]},{f:"callback",label:"Callback requested",val:"No",ls:[]}]},
+"UAT-0157":{id:"UAT-0157",date:"2 Nov 2026",tester:"Anjali Rao",customer:"Lydia Fernandes",lang:"English",
+ lines:[["T2-01","Asha","Hello, am I speaking with Mrs. Lydia Fernandes?"],["T2-02","Customer","Yes."],["T2-03","Asha","This is Asha from Northstar Life Insurance. This call is recorded for quality purposes. Your renewal premium of ₹18,200 for policy ending 2290 is due on 20th November."],["T2-04","Customer","I paid it yesterday on your app."],["T2-05","Asha","Thank you. To avoid any lapse in cover, I can send you a secure payment link right now."],["T2-06","Customer","I just told you I've paid."],["T2-07","Asha","I understand. Payments can take up to 48 hours to reflect. Shall I send the link so you have it handy?"],["T2-08","Customer","No. Please don't call me again about this."],["T2-09","Asha","Noted. Thank you for your time, have a good day."]],
+ post:{disposition:"Payment link sent",due_date:"20/11/2026",callback:"No"},
+ cmp:[{f:"due_date",label:"Due date",val:"20/11/2026",ls:["T2-03"]},{f:"disposition",label:"Disposition",val:"Payment link sent",ls:["T2-04","T2-05","T2-07","T2-08","T2-09"]},{f:"callback",label:"Callback requested",val:"No",ls:[]}]},
+"UAT-0163":{id:"UAT-0163",date:"4 Nov 2026",tester:"Priya Nair",customer:"Salim Iqbal",lang:"Hindi–English (translation in brackets)",
+ lines:[["T3-01","Asha","Namaste, kya main Mr. Salim Iqbal se baat kar rahi hoon? [Hello, am I speaking with Mr. Salim Iqbal?]"],["T3-02","Customer","Haan, boliye. [Yes, go ahead.]"],["T3-03","Asha","Main Asha, Northstar Life se. Aapki policy ending 8815 ka renewal premium ₹31,000, 28 November ko due hai. [I'm Asha from Northstar Life. The renewal premium of ₹31,000 for your policy ending 8815 is due on 28 November.]"],["T3-04","Customer","Dekhiye, mujhe premium ke baare mein kuch doubts hain. Fund value kitni hai abhi? [Look, I have some doubts about the premium. What is the fund value right now?]"],["T3-05","Asha","Main aapko general information de sakti hoon, lekin exact fund value ke liye aapko apni policy statement dekhni hogi. [I can give general information, but for the exact fund value you'll need to check your policy statement.]"],["T3-06","Customer","Aap kisi insaan se baat karwa dijiye. I want to talk to a person."],["T3-07","Asha","Bilkul. Main arrange karti hoon ki hamare advisor aapko call back karein. [Of course. I'll arrange for our advisor to call you back.]"],["T3-08","Customer","Kab tak? [By when?]"],["T3-09","Asha","Jaldi hi. Dhanyavaad, aapka din shubh ho. [Soon. Thank you, have a good day.]"]],
+ post:{disposition:"Not interested",due_date:"28/11/2026",callback:"(blank)"},
+ cmp:[{f:"due_date",label:"Due date",val:"28/11/2026",ls:["T3-03"]},{f:"disposition",label:"Disposition",val:"Not interested",ls:["T3-06","T3-07","T3-09"]},{f:"callback",label:"Callback requested",val:"(blank)",ls:["T3-06","T3-07","T3-08","T3-09"]}]}
+};
+const SHEET_ONLY=["UAT-0149","UAT-0150","UAT-0165","UAT-0168","UAT-0171","UAT-0172"];
+const E2='Karthik (E2, 3 Nov): "#1 and #2 are fixed in today\'s build. For #4 we\'ve increased the end-of-call wait time. Please retest."';
+const row=(id,d,t,c,s,st)=>`Sheet row ${id} · ${d} · ${t} · ${c||"no Call ID"} · severity ${s||"blank"} · status ${st}`;
+const mk=(id,d,rep,call,title,sev,sheet,state,cat,hist,flags,missing)=>({id,date:d,reporter:rep,call,title,severity:sev,sheet,state,category:cat,owner:"",triage:"",dupOf:null,compliance:false,build:"",retests:[],assign:"",flags:flags||[],missing:missing||[],hist:hist.map(h=>({who:h[0],txt:h[1]}))});
+let ISSUES=[
+mk("F01","2-Nov","Priya Nair","UAT-0142","Wrong due date read out","High","Fixed","Open · fix needed","Date accuracy",[["Source",row("F01","2-Nov","Priya","UAT-0142","High","Fixed")],["E2",E2],["E3","Sameer (4 Nov): first retest call had the correct date; on the second call (UAT-0171) it said March again. \"Is this fixed or not?\""],["Tool","State set to Open · fix needed because a retest failed (E3, F08)."]],["Sheet says Fixed, but a later retest failed (E3, F08)."]),
+mk("F02","2-Nov","Priya Nair","UAT-0150","Hindi speech too fast","Medium","Fixed","Retest required","Voice quality",[["Source",row("F02","2-Nov","Priya","UAT-0150","Medium","Fixed")],["E2",E2]],["Sheet says Fixed; no retest result in the pack."]),
+mk("F03","2-Nov","Priya Nair","UAT-0157","Pushes payment link after customer said already paid","P1","Fixed","Open","Payment handling",[["Source",row("F03","2-Nov","Priya","UAT-0157","P1","Fixed")],["E1","Priya reported this as item 3 (UAT-0157)."],["E2","Karthik's reply covers #1, #2 and #4 only."]],["Sheet says Fixed, but E2 does not mention #3 and no fix is recorded."]),
+mk("F04","2-Nov","Priya Nair","UAT-0149","Closing line cuts off customer","Low","Fixed","Retest required","Conversation flow",[["Source",row("F04","2-Nov","Priya","UAT-0149","Low","Fixed")],["E2",E2]],["Sheet says Fixed; no retest result in the pack."]),
+mk("F05","3-Nov","Sameer Khan","UAT-0165","Date is wrong, said March","urgent","Open","Open","Date accuracy",[["Source",row("F05","3-Nov","Sameer","UAT-0165","urgent","Open")]]),
+mk("F06","3-Nov","Anjali Rao","","Agent sounds robotic","","Open","Needs information","Voice quality",[["Source",row("F06","3-Nov","Anjali","","","Open")]],["Call ID and severity are missing in the source report."],["Call ID","Severity"]),
+mk("F07","3-Nov","Anjali Rao","UAT-0168","Due date mismatch vs policy document","High","Open","Open","Date accuracy",[["Source",row("F07","3-Nov","Anjali","UAT-0168","High","Open")]],["Refers to the policy document; may be distinct from the date read-out defect."]),
+mk("F08","4-Nov","Sameer Khan","UAT-0171","Retest #1: still wrong on 2nd call","High","Fixed?","Open","Date accuracy",[["Source",row("F08","4-Nov","Sameer","UAT-0171","High","Fixed?")],["E3","Sameer: second call (UAT-0171) said March again; unsure what to mark in the sheet."]],["Sheet status \"Fixed?\" is unclear; E3 says the second call failed."]),
+mk("F09","4-Nov","Priya Nair","UAT-0163","Asked for a human, not sure callback was logged","Medium","Open","Open","Callback",[["Source",row("F09","4-Nov","Priya","UAT-0163","Medium","Open")]]),
+mk("F10","4-Nov","Anjali Rao","UAT-0172","Agent didn't capture 'don't call again'","","Open","Needs information","Customer preference",[["Source",row("F10","4-Nov","Anjali","UAT-0172","","Open")]],["Severity is missing in the source report. Blank is not low."],["Severity"])
+];
+/* ===== State ===== */
+const PEOPLE=["Priya Nair","Sameer Khan","Anjali Rao","Rahul Mehta","Deepa Iyer"];
+const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,rt:null,sel:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const slug=s=>String(s).toLowerCase().replace(/[^a-z]+/g,"-").replace(/-$/,"");
+const stag=s=>`<span class="tag t-${slug(s)}">${esc(s)}</span>`;
+const byId=id=>ISSUES.find(i=>i.id===id);
+const isTester=()=>["Priya Nair","Sameer Khan","Anjali Rao"].includes(S.actor);
+const isPriya=()=>S.actor==="Priya Nair";
+function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),3200)}
+function need(ok,who){if(!ok)toast("This action is for "+who+". Change “Acting as” at the top right.");return ok}
+function log(i,who,txt){i.hist.push({who,txt})}
+const canon=()=>ISSUES.filter(i=>!i.dupOf), isOpen=i=>!["Verified","Closed with reason"].includes(i.state);
+const sev=i=>i.triage||i.severity||"";
+const isHigh=i=>["critical","high","p1","urgent"].includes(sev(i).toLowerCase());
+const tagged=()=>canon().filter(i=>i.compliance);
+const gateBlocked=()=>tagged().length>0&&S.comp.status!=="Approved";
+const linked=id=>ISSUES.filter(i=>i.dupOf===id);
+const callIssues=id=>ISSUES.filter(i=>i.call===id);
+/* ===== Shell ===== */
+const NAVS=[["S01","Overview / Readiness"],["S02","Test calls"],["S04","Issues"],["S05","Retests"]];
+const TITLES={S01:"Overview / Readiness",S02:"Test Calls",S03:"Call Detail / Report Issue",S04:"Issues",S05:"Retest Workspace"};
+function shell(){
+ const act=S.view==="S03"?"S02":S.view;
+ $("#nav").innerHTML=NAVS.map(n=>`<button class="${act===n[0]?"active":""}" data-act="go" data-arg="${n[0]}">${n[1]}<small>${n[0]}</small></button>`).join("");
+ $("#actor").innerHTML=PEOPLE.map(p=>`<option ${p===S.actor?"selected":""}>${p}</option>`).join("");
+ $("#sid").textContent=S.view+" · "+TITLES[S.view];
+ $("#crumb").innerHTML="Northstar Life / <b>"+TITLES[S.view]+"</b>";
+}
+function render(){shell();({S01:s01,S02:s02,S03:s03,S04:s04,S05:s05})[S.view]();window.scrollTo(0,0)}
+function setActor(v){S.actor=v;render()}
+/* ===== S01 Overview / Readiness ===== */
+function s01(){
+ const c=canon(),open=c.filter(isOpen),blockers=open.filter(isHigh),triage=open.filter(i=>!sev(i)||i.state==="Needs information"),await_=c.filter(i=>i.state==="Retest required"),over=ISSUES.filter(i=>i.state==="Closed with reason"),tg=tagged(),gb=gateBlocked();
+ const list=(a,f)=>a.length?a.map(f).join(""):`<div class="empty">Nothing here.</div>`;
+ const li=i=>`<div class="row"><span><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button><br><small class="muted">${esc(i.call||"No Call ID")} · severity ${esc(sev(i)||"not supplied")}</small></span>${stag(i.state)}</div>`;
+ $("#content").innerHTML=`<div class="head"><div><h1>Overview / Readiness</h1><p class="sub">Evidence for the go-live decision. Nothing is inferred as passed.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
+ <div class="stats"><div class="stat"><small>Open blockers</small><strong>${blockers.length}</strong><small>High, P1, urgent or critical</small></div><div class="stat"><small>Retests awaiting verification</small><strong>${await_.length}</strong><small>Fix delivered ≠ verified</small></div><div class="stat"><small>Need triage</small><strong>${triage.length}</strong><small>Severity or call info missing</small></div><div class="stat"><small>Closures overridden</small><strong>${over.length}</strong><small>Closed after a failed retest</small></div></div>
+ <div class="grid"><section>
+  <div class="panel"><div class="ph"><h2>Open blockers</h2><button class="link" data-act="go" data-arg="S04">All issues →</button></div>${list(blockers,li)}</div>
+  <div class="panel"><div class="ph"><h2>Need triage</h2></div>${list(triage,li)}</div>
+  <div class="panel"><div class="ph"><h2>Retests awaiting verification</h2><button class="link" data-act="go" data-arg="S05">Retest workspace →</button></div>${list(await_,li)}</div>
+  <div class="panel"><div class="ph"><h2>Closures overridden after a failed retest</h2></div>${list(over,i=>`<div class="row"><span><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button><br><small class="muted">Reason: ${esc(i.closeReason)} · Rahul notified</small></span>${stag(i.state)}</div>`)}</div>
+ </section><section>
+  <div class="panel"><div class="ph"><h2>Compliance gate</h2><span class="tag ${gb?"t-bad":"t-ok"}">${gb?"Sign-off blocked":"Not blocking"}</span></div>
+   <p class="muted">Wording issues tagged “Disclosure / Compliance”: <b>${tg.length}</b>. Deepa Iyer reviews wording outside this workspace; Priya records her decision here.</p>
+   <div class="kv"><span>Compliance status</span><b>${esc(S.comp.status)}</b></div>${S.comp.note?`<div class="kv"><span>Note</span><span>${esc(S.comp.note)}</span></div>`:""}
+   ${tg.map(i=>`<div class="row"><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button></div>`).join("")}
+   ${gb?`<div class="flag bad">Sign-off stays blocked until Compliance status is Approved.</div>`:""}
+   <button class="btn" style="margin-top:8px" data-act="comp">Record Compliance status</button></div>
+  <div class="panel"><div class="ph"><h2>UAT recommendation</h2>${S.rec?stag(S.rec.v):'<span class="tag">Not recorded</span>'}</div>
+   ${S.rec?`<p>${esc(S.rec.why)}</p><small class="muted">Recorded by Priya Nair · ${esc(S.rec.at)}</small>`:'<p class="muted">Priya records a recommendation with her rationale.</p>'}
+   <div style="margin-top:10px"><button class="btn" data-act="rec">Record recommendation</button></div></div>
+  <div class="panel"><div class="ph"><h2>Go / No-go decision</h2>${S.dec?stag(S.dec.v):'<span class="tag">Not recorded</span>'}</div>
+   ${S.dec?`<p>${esc(S.dec.why)}</p><small class="muted">Recorded by Rahul Mehta · ${esc(S.dec.at)}</small>`:'<p class="muted">Rahul records the decision after Priya’s recommendation. No dashboard count decides it.</p>'}
+   <div style="margin-top:10px"><button class="btn primary" data-act="dec">Record decision</button></div></div>
+ </section></div>`}
+/* ===== S02 Test calls ===== */
+function s02(){
+ const q=S.q.calls.toLowerCase();
+ const rows=[...Object.values(CALLS).map(c=>({id:c.id,full:true,c})),...SHEET_ONLY.map(id=>({id,full:false}))].filter(r=>!q||(r.id+(r.c?r.c.customer+r.c.tester:"")).toLowerCase().includes(q));
+ $("#content").innerHTML=`<div class="head"><div><h1>Test calls</h1><p class="sub">Open a call to compare what was said with what the system stored.</p></div></div>
+ <div class="panel"><div class="toolbar"><input class="field" id="cq" placeholder="Search call ID, customer, tester…" value="${esc(S.q.calls)}" oninput="S.q.calls=this.value;s02();document.getElementById('cq').focus();const e=document.getElementById('cq');e.setSelectionRange(e.value.length,e.value.length)"></div>
+ <div class="tablewrap"><table><thead><tr><th>Call ID</th><th>Customer (played by)</th><th>Tester</th><th>Date</th><th>Language</th><th>Review</th><th>Linked issues</th></tr></thead><tbody>${rows.length?rows.map(r=>{const n=callIssues(r.id).length;
+  return r.full?`<tr><td><button class="link" data-act="openCall" data-arg="${r.id}">${r.id}</button></td><td>${esc(r.c.customer)}</td><td>${esc(r.c.tester)}</td><td>${r.c.date}</td><td>${esc(r.c.lang)}</td><td>${S.reviewed[r.id]?stag("Verified").replace("Verified","Reviewed"):'<span class="tag t-warn">Not reviewed</span>'}</td><td>${n}</td></tr>`
+  :`<tr class="dim"><td>${r.id}</td><td colspan="4">Transcript not supplied in the starter pack</td><td><span class="tag">—</span></td><td>${n?`<button class="link" data-act="openIssue" data-arg="${callIssues(r.id)[0].id}">${n} (${callIssues(r.id).map(i=>i.id).join(", ")})</button>`:0}</td></tr>`}).join(""):`<tr><td colspan="7"><div class="empty">No calls match your search.</div></td></tr>`}</tbody></table></div></div>`}
+/* ===== S03 Call detail / Report issue ===== */
+function s03(){
+ const c=CALLS[S.callId],ck=S.checks[c.id]||(S.checks[c.id]={}),lines=Object.fromEntries(c.lines.map(l=>[l[0],l]));
+ const all=c.cmp.every(x=>ck[x.f]),mm=c.cmp.filter(x=>ck[x.f]==="mm").length;
+ $("#content").innerHTML=`<div class="head"><div><button class="link" data-act="go" data-arg="S02">← Back to test calls</button><h1 style="margin-top:6px">${c.id} · ${esc(c.customer)}</h1><p class="sub">${esc(c.date)} · Tester ${esc(c.tester)} · ${esc(c.lang)}</p></div><div>${S.reviewed[c.id]?'<span class="tag t-ok">Reviewed</span> ':""}<button class="btn primary" data-act="report" data-arg="${c.id}">＋ Report issue</button></div></div>
+ <div class="cols"><section><div class="panel"><div class="ph"><h2>Transcript</h2><small class="muted">Click lines to use them as evidence</small></div>
+  ${c.lines.map(l=>`<div class="line ${S.sel.includes(l[0])?"picked":""}" data-act="pick" data-arg="${l[0]}"><b>${l[0]}</b><span><strong>${l[1]}</strong> — ${esc(l[2])}</span></div>`).join("")}
+  ${S.sel.length?`<div class="selbar"><span>${S.sel.length} line(s) selected: ${S.sel.join(", ")}</span><span><button class="btn" data-act="clearSel">Clear</button> <button class="btn primary" data-act="report" data-arg="${c.id}">Report issue from selection</button></span></div>`:""}</div></section>
+ <section><div class="panel"><h2 style="margin-bottom:8px">Post-call record (stored by the system)</h2>
+  <div class="kv"><span>Disposition</span><b>${esc(c.post.disposition)}</b></div><div class="kv"><span>Lead record: due_date</span><b>${esc(c.post.due_date)}</b></div><div class="kv"><span>Callback requested</span><b>${esc(c.post.callback)}</b></div></div>
+  <div class="panel"><div class="ph"><h2>Compare transcript with record</h2><small class="muted">Every call needs this check</small></div>
+  ${c.cmp.map(x=>{const st=ck[x.f];return `<div class="cmp ${st==="mm"?"mm":st==="ok"?"okc":""}"><div class="ph" style="margin:0"><b>${x.label}</b><span class="sv">${esc(x.val)}</span></div>
+   ${x.ls.length?x.ls.map(id=>`<q><b>${id}</b> ${esc(lines[id][2])}</q>`).join(""):'<q class="muted">No related transcript lines marked.</q>'}
+   <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn ${st==="ok"?"soft":""}" data-act="chk" data-arg="${x.f}|ok">Matches</button><button class="btn ${st==="mm"?"danger":""}" data-act="chk" data-arg="${x.f}|mm">Mismatch</button>${st==="mm"?`<button class="btn primary" data-act="attach" data-arg="${x.f}">Attach to a new issue</button>`:""}</div></div>`}).join("")}
+  ${mm?`<div class="flag bad">${mm} mismatch(es) flagged. Priya sees them in the issue queue once reported.</div>`:""}
+  <button class="btn ${all?"primary":"off"}" data-act="reviewed">Mark call reviewed</button> ${!all?'<small class="muted">Check all three fields first.</small>':""}</div>
+  <div class="panel"><h2 style="margin-bottom:8px">Issues linked to this call</h2>${callIssues(c.id).length?callIssues(c.id).map(i=>`<div class="row"><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button>${stag(i.state)}</div>`).join(""):'<div class="empty">No issues linked to this call yet.</div>'}</div></section></div>`}
+/* ===== S04 Issues ===== */
+function s04(){S.issueId?issueDetail():issueList()}
+function issueList(){
+ const q=S.q.issues.toLowerCase(),f=S.q;
+ const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));
+ const states=["Open","Needs information","Retest required","Open · fix needed","Verified","Closed with reason"],sevs=[...new Set(ISSUES.map(i=>sev(i)).filter(Boolean)),"Not supplied"];
+ $("#content").innerHTML=`<div class="head"><div><h1>Issues</h1><p class="sub">One record per problem. “Fixed” in the sheet is shown, but only a passing retest makes an issue Verified.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
+ <div class="panel"><div class="toolbar"><input class="field" id="iq" placeholder="Search issue or Call ID…" value="${esc(S.q.issues)}" oninput="S.q.issues=this.value;issueList();const e=document.getElementById('iq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
+ <select class="field" onchange="S.q.state=this.value;issueList()"><option value="">All states</option>${states.map(s=>`<option ${f.state===s?"selected":""}>${s}</option>`).join("")}</select>
+ <select class="field" onchange="S.q.sev=this.value;issueList()"><option value="">All severity</option>${sevs.map(s=>`<option ${f.sev===s?"selected":""}>${s}</option>`).join("")}</select></div>
+ <div class="tablewrap"><table><thead><tr><th>Issue</th><th>Call</th><th>Severity</th><th>Sheet status</th><th>State</th><th>Owner</th></tr></thead><tbody>${rows.length?rows.map(i=>`<tr>
+  <td><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button>${i.dupOf?`<br><small class="muted">Duplicate of ${i.dupOf}</small>`:linked(i.id).length?`<br><small class="muted">+${linked(i.id).length} linked report(s)</small>`:""}${i.compliance?'<br><span class="tag t-blue">Disclosure / Compliance</span>':""}</td>
+  <td>${i.call?esc(i.call):'<span class="tag t-warn">No Call ID</span>'}</td><td>${sev(i)?esc(sev(i)):'<span class="tag t-warn">Not supplied</span>'}</td><td>${esc(i.sheet)}${i.flags.length&&i.sheet.startsWith("Fixed")?'<br><span class="tag t-warn">unverified</span>':""}</td><td>${stag(i.state)}</td><td>${i.owner?esc(i.owner):'<span class="muted">Unassigned</span>'}</td></tr>`).join(""):`<tr><td colspan="6"><div class="empty">No issues match these filters.</div></td></tr>`}</tbody></table></div></div>`}
+function issueDetail(){
+ const i=byId(S.issueId),cl=CALLS[i.call],ls=linked(i.id);
+ const sug=canon().filter(x=>x.id!==i.id&&x.category===i.category&&!i.dupOf);
+ const canClose=i.state==="Open · fix needed";
+ $("#content").innerHTML=`<div class="head"><div><button class="link" data-act="back">← Back to issues</button><h1 style="margin-top:6px">${i.id} · ${esc(i.title)}</h1><p class="sub">Reported by ${esc(i.reporter)} on ${i.date}${i.dupOf?` · Duplicate of <button class="link" data-act="openIssue" data-arg="${i.dupOf}">${i.dupOf}</button>`:""}</p></div><div>${stag(i.state)}</div></div>
+ ${i.flags.map(f=>`<div class="flag">⚠ ${esc(f)}</div>`).join("")}
+ ${i.missing.length?`<div class="flag bad">Missing information: ${i.missing.join(", ")}. Add it below to move this out of Needs information.</div>`:""}
+ <div class="cols"><section>
+  <div class="panel"><h2 style="margin-bottom:8px">Details</h2>
+   <div class="kv"><span>Call</span><span>${i.call?(cl?`<button class="link" data-act="openCall" data-arg="${i.call}">${i.call}</button>`:`${i.call} <small class="muted">(transcript not supplied)</small>`):`<select onchange="setCall('${i.id}',this.value)"><option value="">Select Call ID…</option>${[...Object.keys(CALLS),...SHEET_ONLY].map(c=>`<option>${c}</option>`).join("")}</select>`}</span></div>
+   <div class="kv"><span>Severity (as supplied)</span><b>${esc(i.severity||"Not supplied")}</b></div>
+   <div class="kv"><span>Triage severity</span><span><select onchange="setTriage('${i.id}',this.value)"><option value="">Not set</option>${["Critical","High","Medium","Low"].map(s=>`<option ${i.triage===s?"selected":""}>${s}</option>`).join("")}</select> <small class="muted">Priya confirms</small></span></div>
+   <div class="kv"><span>Owner</span><span><select onchange="setOwner('${i.id}',this.value)"><option value="">Unassigned</option>${["Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option ${i.owner===s?"selected":""}>${s}</option>`).join("")}</select></span></div>
+   <div class="kv"><span>Category (suggested)</span><b>${esc(i.category)}</b></div>
+   <div class="kv"><span>Sheet status</span><b>${esc(i.sheet)}</b></div>
+   <div class="kv"><span>Fix build</span><b>${esc(i.build||"Not recorded")}</b></div>
+   <div class="kv"><span>Compliance</span><span>${i.compliance?'<span class="tag t-blue">Disclosure / Compliance</span> ':""}<button class="btn" data-act="tagComp" data-arg="${i.id}">${i.compliance?"Remove tag":"Tag as wording issue"}</button></span></div></div>
+  <div class="panel"><h2 style="margin-bottom:8px">Linked reports</h2>
+   ${i.dupOf?`<p class="muted">This report is kept as evidence under ${i.dupOf}.</p>`:ls.length?ls.map(x=>`<div class="row"><span>${x.id} · ${esc(x.title)}<br><small class="muted">${esc(x.call||"No Call ID")} · ${esc(x.reporter)}</small></span></div>`).join(""):'<p class="muted">No linked reports.</p>'}
+   ${!i.dupOf&&sug.length?`<div class="flag">Possible duplicates (same category): ${sug.map(x=>`<button class="link" data-act="link" data-arg="${x.id}|${i.id}">Link ${x.id} under ${i.id}</button>`).join(" · ")}<br><small>Priya confirms each link. Every call and reporter is kept.</small></div>`:""}</div></section>
+ <section>
+  <div class="panel"><h2 style="margin-bottom:8px">Actions</h2><div style="display:grid;gap:8px">
+   <button class="btn soft" data-act="fix" data-arg="${i.id}">Record fix delivered (from Karthik’s email)</button>
+   <button class="btn" data-act="toRetest" data-arg="${i.id}">Open in Retest workspace</button>
+   <button class="btn ${canClose?"danger":"off"}" data-act="close" data-arg="${i.id}">Close with reason</button>
+   ${canClose?"":'<small class="muted">Closing with a reason is only possible after a failed retest. Verified needs a passing retest.</small>'}</div></div>
+  <div class="panel"><h2 style="margin-bottom:8px">Retest results</h2>${i.retests.length?i.retests.map(r=>`<div class="row"><span><b>${r.outcome}</b> on build ${esc(r.build)}<br><small class="muted">${esc(r.tester)} · ${esc(r.at)} · ${esc(r.notes)}</small></span></div>`).join(""):'<div class="empty">No retest recorded yet.</div>'}</div>
+  <div class="panel"><h2 style="margin-bottom:8px">Activity</h2><div class="hist">${i.hist.map(h=>`<b>${esc(h.who)}</b><p>${esc(h.txt)}</p>`).join("")}</div></div></section></div>`}
+/* ===== S05 Retest workspace ===== */
+function s05(){
+ const q=ISSUES.filter(i=>i.state==="Retest required"),cur=byId(S.rt)&&byId(S.rt).state==="Retest required"?byId(S.rt):null;
+ $("#content").innerHTML=`<div class="head"><div><h1>Retest workspace</h1><p class="sub">A retest is recorded against a named build. Pass is the only route to Verified.</p></div></div>
+ <div class="cols"><section><div class="panel"><h2 style="margin-bottom:8px">Awaiting retest</h2>${q.length?`<div class="tablewrap"><table style="min-width:420px"><thead><tr><th>Issue</th><th>Build</th><th>Assigned tester</th></tr></thead><tbody>${q.map(i=>`<tr class="${cur&&cur.id===i.id?"sel":""}"><td><button class="link" data-act="rt" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button></td><td>${esc(i.build||"Not recorded")}</td><td><select onchange="assign('${i.id}',this.value)"><option value="">Unassigned</option>${["Sameer Khan","Anjali Rao","Priya Nair"].map(s=>`<option ${i.assign===s?"selected":""}>${s}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">No issues awaiting retest. Record a fix delivered on an issue first.</div>'}</div></section>
+ <section>${cur?`<div class="panel"><div class="ph"><h2>${cur.id} · ${esc(cur.title)}</h2>${stag(cur.state)}</div>
+  <div class="kv"><span>Original evidence</span><span>${esc(cur.call||"No Call ID")} · ${esc(cur.hist[0].txt)}</span></div>
+  <div class="kv"><span>Assigned tester</span><b>${esc(cur.assign||"Unassigned")}</b></div>
+  <div class="form" style="margin-top:12px"><label>Build tested *<input id="rb" placeholder="Build identifier" value="${esc(cur.build)}"></label><label>Outcome<select id="ro"><option>Pass</option><option>Fail</option><option>Blocked</option></select></label>
+  <label class="full">Scenario repeated<textarea id="rs" placeholder="Which call or scenario did you repeat?">${cur.call?"Repeat of "+cur.call+": "+cur.title:""}</textarea></label>
+  <label>Expected result<textarea id="re"></textarea></label><label>Actual result<textarea id="ra"></textarea></label><label class="full">Notes *<textarea id="rn"></textarea></label></div>
+  <div class="err" id="rerr"></div><div style="margin-top:10px"><button class="btn primary" data-act="saveRt" data-arg="${cur.id}">Submit retest result</button></div></div>
+  <div class="panel"><h2 style="margin-bottom:8px">Result history</h2>${cur.retests.length?cur.retests.map(r=>`<div class="row"><span><b>${r.outcome}</b> on build ${esc(r.build)}<br><small class="muted">${esc(r.tester)} · ${esc(r.at)} · ${esc(r.notes)}</small></span></div>`).join(""):'<div class="empty">No results yet.</div>'}</div>`:'<div class="empty">Select an issue to record a retest result.</div>'}</section></div>`}
+/* ===== Actions ===== */
+const A={
+ go(v){S.view=v;S.issueId=null;render()},
+ back(){S.issueId=null;render()},
+ openCall(id){if(!CALLS[id]){toast("Transcript not supplied in the starter pack.");return}S.callId=id;S.sel=[];S.view="S03";render()},
+ openIssue(id){S.issueId=id;S.view="S04";render()},
+ pick(id){const k=S.sel.indexOf(id);k<0?S.sel.push(id):S.sel.splice(k,1);s03()},
+ clearSel(){S.sel=[];s03()},
+ chk(a){const[f,v]=a.split("|"),c=S.checks[S.callId];c[f]=c[f]===v?undefined:v;S.reviewed[S.callId]=false;s03()},
+ reviewed(){const c=CALLS[S.callId];if(!c.cmp.every(x=>(S.checks[c.id]||{})[x.f])){toast("Check all three fields before marking this call reviewed.");return}S.reviewed[c.id]=true;toast("Call marked reviewed");s03()},
+ report(id){reportModal(typeof id==="string"&&id.startsWith("UAT")?id:(S.view==="S03"?S.callId:""),null)},
+ attach(f){const c=CALLS[S.callId],x=c.cmp.find(y=>y.f===f);reportModal(c.id,{title:"Mismatch: "+x.label,lines:x.ls,actual:"Stored "+x.label+": "+x.val+". Transcript lines: "+(x.ls.join(", ")||"none marked")+"."})},
+ fix(id){if(!need(isPriya(),"Priya Nair"))return;modal("Record fix delivered",`<p class="muted" style="margin-bottom:10px">Karthik has no login. Priya records the fix from his email. This moves the issue to Retest required, not Verified.</p><div class="form"><label>Build *<input id="fb" placeholder="Build identifier from the vendor's email"></label><label>Source<input value="Karthik S (vendor email)" disabled></label><label class="full">What the vendor said changed<textarea id="fn"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveFix" data-arg="${id}">Save</button>`)},
+ saveFix(id){const b=$("#fb").value.trim();if(!b){$("#merr").textContent="Build is required.";return}const i=byId(id);i.build=b;i.state="Retest required";i.assign="";log(i,"Karthik S (recorded by Priya Nair)","Fix delivered in build "+b+". "+$("#fn").value);closeModal();toast("Fix recorded. Retest required.");render()},
+ toRetest(id){const i=byId(id);if(i.state!=="Retest required"){toast("Record a fix delivered first. Only then can it be retested.");return}S.rt=id;S.view="S05";render()},
+ rt(id){S.rt=id;s05()},
+ saveRt(id){const i=byId(id),b=$("#rb").value.trim(),n=$("#rn").value.trim();
+  if(!isTester()){need(false,"a tester or Priya");return}
+  if(!b||!n){$("#rerr").textContent="Result not saved: build and notes are required. Your other inputs are kept.";return}
+  const o=$("#ro").value;i.build=b;i.retests.push({outcome:o,build:b,tester:S.actor,at:now(),notes:n});
+  log(i,S.actor,"Retest on build "+b+": "+o+". "+n);
+  if(o==="Pass"){i.state="Verified";toast("Passed. Issue is Verified.")}else if(o==="Fail"){i.state="Open · fix needed";toast("Failed. Issue reopened as Open · fix needed.")}else{toast("Blocked. Issue stays in Retest required.")}
+  S.rt=null;render()},
+ close(id){const i=byId(id);if(i.state!=="Open · fix needed"){toast("Closing with a reason is only possible after a failed retest.");return}if(!need(isPriya(),"Priya Nair"))return;
+  modal("Close with reason",`<p class="muted" style="margin-bottom:10px">The last retest failed. The failed result stays in the history and Rahul is notified.</p><div class="form"><label class="full">Reason for closing *<textarea id="cr" placeholder="Why is it acceptable to close this issue?"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn danger" data-act="saveClose" data-arg="${id}">Close issue</button>`)},
+ saveClose(id){const r=$("#cr").value.trim();if(!r){$("#merr").textContent="A reason is required.";return}const i=byId(id);i.state="Closed with reason";i.closeReason=r;log(i,"Priya Nair","Closed with reason after a failed retest: "+r);S.notes.push(id);closeModal();toast("Closed with reason. Rahul notified.");render()},
+ tagComp(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);i.compliance=!i.compliance;log(i,"Priya Nair",i.compliance?"Tagged as a wording issue (Disclosure / Compliance).":"Compliance tag removed.");render()},
+ link(a){if(!need(isPriya(),"Priya Nair"))return;const[c,p]=a.split("|"),i=byId(c);i.dupOf=p;log(i,"Priya Nair","Linked as a duplicate of "+p+". Call and reporter kept.");log(byId(p),"Priya Nair",c+" linked under this issue.");toast(c+" linked under "+p);render()},
+ comp(){if(!need(isPriya(),"Priya Nair"))return;modal("Record Compliance status",`<p class="muted" style="margin-bottom:10px">The review happens outside this workspace. Record what Deepa Iyer confirmed.</p><div class="form"><label>Status<select id="cs"><option ${S.comp.status==="Pending"?"selected":""}>Pending</option><option ${S.comp.status==="Approved"?"selected":""}>Approved</option></select></label><label class="full">Note<textarea id="cn">${esc(S.comp.note)}</textarea></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveComp">Save</button>`)},
+ saveComp(){S.comp={status:$("#cs").value,note:$("#cn").value.trim()};closeModal();toast("Compliance status: "+S.comp.status);render()},
+ rec(){if(!need(isPriya(),"Priya Nair"))return;modal("UAT recommendation",`<div class="form"><label>Recommendation<select id="rv"><option>Go</option><option>Conditional go</option><option>No-go</option></select></label><label class="full">Rationale *<textarea id="rw"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveRec">Save</button>`)},
+ saveRec(){const w=$("#rw").value.trim();if(!w){$("#merr").textContent="A rationale is required.";return}S.rec={v:$("#rv").value,why:w,at:now()};closeModal();render()},
+ dec(){if(!need(S.actor==="Rahul Mehta","Rahul Mehta"))return;if(!S.rec){toast("Priya must record her recommendation first.");return}
+  modal("Go / No-go decision",`<div class="flag">${canon().filter(i=>isOpen(i)&&isHigh(i)).length} open blocker(s) and ${canon().filter(i=>i.state==="Retest required").length} retest(s) awaiting verification.</div><div class="form"><label>Decision<select id="dv"><option>Go</option><option>Conditional go</option><option>No-go</option></select></label><label class="full">Rationale, including accepted risks *<textarea id="dw"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveDec">Record decision</button>`)},
+ saveDec(){const v=$("#dv").value,w=$("#dw").value.trim();if(v!=="No-go"&&gateBlocked()){$("#merr").textContent="Sign-off blocked: Compliance has not approved the wording issue(s) tagged in this release.";return}if(!w){$("#merr").textContent="A rationale is required.";return}S.dec={v,why:w,at:now()};closeModal();toast("Decision recorded: "+v);render()},
+ closeModal(){closeModal()}
+};
+function now(){return new Date().toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+function setTriage(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);i.triage=v;log(i,"Priya Nair","Triage severity set to "+(v||"Not set")+".");if(v&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity")}fixNeeds(i);render()}
+function setCall(id,v){const i=byId(id);if(!v)return;i.call=v;log(i,S.actor,"Call ID added: "+v+".");i.missing=i.missing.filter(m=>m!=="Call ID");fixNeeds(i);render()}
+function setOwner(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);i.owner=v;log(i,"Priya Nair","Owner set to "+(v||"Unassigned")+".");render()}
+function assign(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);i.assign=v;log(i,"Priya Nair","Retest assigned to "+(v||"nobody")+".");s05()}
+function fixNeeds(i){if(!i.missing.length&&i.state==="Needs information"){i.state="Open";log(i,"Tool","All missing information supplied. State set to Open.")}}
+/* ===== Report issue ===== */
+const CATS=["Date accuracy","Payment handling","Voice quality","Conversation flow","Callback","Customer preference","Disclosure / Compliance","Other"];
+function reportModal(call,pre){
+ if(!need(isTester(),"a tester or Priya"))return;
+ const lines=pre?pre.lines:S.sel;
+ modal("Report an issue",`<div class="form"><label>Linked Call ID<select id="rc" onchange="similar()"><option value="">Select Call ID…</option>${[...Object.keys(CALLS),...SHEET_ONLY].map(c=>`<option ${c===call?"selected":""}>${c}</option>`).join("")}</select></label>
+ <label>Category<select id="rg" onchange="similar()">${CATS.map(c=>`<option>${c}</option>`).join("")}</select></label>
+ <label class="full">Evidence lines<input id="rl" value="${esc(lines.join(", "))}" placeholder="Select lines in the transcript first (optional)"></label>
+ <label class="full">Title *<input id="rt" value="${esc(pre?pre.title:"")}"></label>
+ <label class="full">Expected<textarea id="rx"></textarea></label><label class="full">Actual *<textarea id="ra2">${esc(pre?pre.actual:"")}</textarea></label>
+ <label>Severity (suggested)<select id="rv2"><option value="">Not set</option>${["Critical","High","Medium","Low"].map(s=>`<option>${s}</option>`).join("")}</select></label>
+ <label>Reporter<input value="${esc(S.actor)}" disabled></label>
+ <label class="full">Similar existing issues<select id="rd"><option value="">Create as a new issue</option></select></label></div>
+ <div class="flag" style="margin-top:10px">Missing a Call ID or severity? You can still save. The report is kept as Needs information.</div><div class="err" id="merr"></div>`,
+ `<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" onclick="saveIssue()">Save report</button>`);similar()}
+function similar(){const c=$("#rc").value,g=$("#rg").value,s=canon().filter(i=>i.category===g||(c&&i.call===c));$("#rd").innerHTML='<option value="">Create as a new issue</option>'+s.map(i=>`<option value="${i.id}">Link as duplicate of ${i.id} · ${esc(i.title)}</option>`).join("")}
+function saveIssue(){
+ const t=$("#rt").value.trim(),a=$("#ra2").value.trim();if(!t||!a){$("#merr").textContent="Title and actual behaviour are required.";return}
+ const call=$("#rc").value,sv=$("#rv2").value,miss=[];if(!call)miss.push("Call ID");if(!sv)miss.push("Severity");
+ const id="F"+String(Math.max(...ISSUES.map(i=>+i.id.slice(1)))+1).padStart(2,"0"),cat=$("#rg").value,parent=$("#rd").value;
+ const i=mk(id,"New",S.actor,call,t,sv,"—",miss.length?"Needs information":"Open",cat,[[S.actor,"Reported. Evidence lines: "+($("#rl").value||"none")+". Expected: "+($("#rx").value||"not stated")+". Actual: "+a]],[],miss);
+ i.compliance=cat==="Disclosure / Compliance";if(parent){i.dupOf=parent;log(byId(parent),S.actor,id+" linked under this issue.")}
+ ISSUES.unshift(i);S.sel=[];closeModal();toast(id+" saved"+(miss.length?" as Needs information":""));S.issueId=id;S.view="S04";render()}
+/* ===== Modal + events ===== */
+function modal(t,b,f){$("#mt").textContent=t;$("#mbody").innerHTML=b;$("#mfoot").innerHTML=f;$("#mbg").classList.add("show")}
+function closeModal(){$("#mbg").classList.remove("show")}
+$("#mbg").onclick=e=>{if(e.target.id==="mbg")closeModal()};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
+render();
+</script></body></html>
