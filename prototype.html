@@ -69,6 +69,28 @@ tr.sel td{background:#f5f8ff}tr.dim td{color:#98a2b3}
 .cmp .status.match{background:#dbeddb;color:#448361}
 .cmp .status.mismatch{background:#ffe2dd;color:#d44c47}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
+/* S04 inline editing + drawer */
+.editable{position:relative;padding-right:18px}
+.editable .pencil{position:absolute;right:4px;top:50%;transform:translateY(-50%);opacity:0;font-size:11px;color:var(--muted);transition:opacity .12s;pointer-events:none}
+.editable:hover .pencil{opacity:1}
+.editable select{width:100%;padding:4px 6px;border:1px solid var(--blue);border-radius:6px;background:#fff}
+.rowclick{cursor:pointer}
+.rowclick:hover td{background:#f5f8ff}
+.drawer-backdrop{position:fixed;inset:0;background:rgba(16,24,40,.35);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
+.drawer-backdrop.show{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:50vw;min-width:560px;max-width:850px;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,.12);transform:translateX(100%);transition:transform .28s ease;z-index:41;display:flex;flex-direction:column}
+.drawer.show{transform:translateX(0)}
+.drawer-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;position:sticky;top:0;background:#fff;z-index:2}
+.drawer-body{padding:18px;overflow:auto;flex:1}
+.drawer-title{font-size:18px;font-weight:700;color:var(--ink);margin:0}
+.drawer-sub{font-size:12px;color:var(--muted)}
+.drawer-section{margin-bottom:16px}
+.drawer-section h3{font-size:13px;text-transform:uppercase;color:var(--muted);margin:0 0 8px;letter-spacing:.4px}
+.drawer-kv{display:grid;grid-template-columns:160px 1fr;padding:6px 0;border-bottom:1px solid #f0f1f4;gap:8px;font-size:13.5px}
+.drawer-kv span:first-child{color:var(--muted)}
+.drawer-act{display:flex;gap:6px;flex-wrap:wrap}
+@media(max-width:900px){.drawer{width:100vw;min-width:0;max-width:100vw}}
+.toast.show{display:block}
 </style></head><body>
 <div class="app">
 <aside class="side"><div class="brand"><span class="mark">N</span>Northstar Life</div>
@@ -112,7 +134,7 @@ mk("F10","4-Nov","Anjali Rao","UAT-0172","Agent didn't capture 'don't call again
 ];
 /* ===== State ===== */
 const PEOPLE=["Priya Nair","Sameer Khan","Anjali Rao","Rahul Mehta","Deepa Iyer"];
-const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,rt:null,sel:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
+const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,drawerOpen:false,editing:null,rt:null,sel:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const slug=s=>String(s).toLowerCase().replace(/[^a-z]+/g,"-").replace(/-$/,"");
 const stag=s=>`<span class="tag t-${slug(s)}">${esc(s)}</span>`;
@@ -121,7 +143,7 @@ const isTester=()=>["Priya Nair","Sameer Khan","Anjali Rao"].includes(S.actor);
 const isPriya=()=>S.actor==="Priya Nair";
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),3200)}
 function need(ok,who){if(!ok)toast("This action is for "+who+". Change “Acting as” at the top right.");return ok}
-function log(i,who,txt){i.hist.push({who,txt})}
+function log(i,who,txt){i.hist.push({who,txt,at:now()})}
 const canon=()=>ISSUES.filter(i=>!i.dupOf), isOpen=i=>!["Verified","Closed with reason"].includes(i.state);
 const sev=i=>i.triage||i.severity||"";
 const isHigh=i=>["critical","high","p1","urgent"].includes(sev(i).toLowerCase());
@@ -194,46 +216,88 @@ function s03(){
   <button class="btn ${all?"primary":"off"}" data-act="reviewed">Mark call reviewed</button> ${!all?'<small class="muted">Check all three fields first.</small>':""}</div>
   <div class="panel"><h2 style="margin-bottom:8px">Issues linked to this call</h2>${callIssues(c.id).length?callIssues(c.id).map(i=>`<div class="row"><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button>${stag(i.state)}</div>`).join(""):'<div class="empty">No issues linked to this call yet.</div>'}</div></section></div>`}
 /* ===== S04 Issues ===== */
-function s04(){S.issueId?issueDetail():issueList()}
-function issueList(){
+function s04(){
  const q=S.q.issues.toLowerCase(),f=S.q;
  const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));
  const states=["Open","Needs information","Retest required","Open · fix needed","Verified","Closed with reason"],sevs=[...new Set(ISSUES.map(i=>sev(i)).filter(Boolean)),"Not supplied"];
- $("#content").innerHTML=`<div class="head"><div><h1>Issues</h1><p class="sub">One record per problem. “Fixed” in the sheet is shown, but only a passing retest makes an issue Verified.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
+ $("#content").innerHTML=`<div class="head"><div><h1>Issues</h1><p class="sub">One record per problem. Edit severity, state, vendor status and owner inline. Click a title or row to open the detail drawer.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
  <div class="panel"><div class="toolbar"><input class="field" id="iq" placeholder="Search issue or Call ID…" value="${esc(S.q.issues)}" oninput="S.q.issues=this.value;issueList();const e=document.getElementById('iq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
  <select class="field" onchange="S.q.state=this.value;issueList()"><option value="">All states</option>${states.map(s=>`<option ${f.state===s?"selected":""}>${s}</option>`).join("")}</select>
  <select class="field" onchange="S.q.sev=this.value;issueList()"><option value="">All severity</option>${sevs.map(s=>`<option ${f.sev===s?"selected":""}>${s}</option>`).join("")}</select></div>
- <div class="tablewrap"><table><thead><tr><th>Issue</th><th>Call</th><th>Severity</th><th>Sheet status</th><th>State</th><th>Owner</th></tr></thead><tbody>${rows.length?rows.map(i=>`<tr>
+ <div class="tablewrap"><table><thead><tr><th>Issue</th><th>Call</th><th>Severity</th><th>Sheet status</th><th>State</th><th>Owner</th></tr></thead><tbody id="issuetbody">${rows.length?rows.map(i=>issueRowHtml(i)).join(""):`<tr><td colspan="6"><div class="empty">No issues match these filters.</div></td></tr>`}</tbody></table></div></div>
+ <div class="drawer-backdrop ${S.drawerOpen?'show':''}" data-act="closeDrawer"></div>
+ <div class="drawer ${S.drawerOpen?'show':''}" id="issuedrawer">${S.drawerOpen&&S.issueId?drawerHtml(byId(S.issueId)):''}</div>`}
+function issueList(){s04()}
+function updateIssueRow(id){const i=byId(id);const old=document.querySelector('tr[data-issue="'+id+'"]');if(!old)return;const tmp=document.createElement('tbody');tmp.innerHTML=issueRowHtml(i);const nw=tmp.firstElementChild;if(nw)old.replaceWith(nw)}
+function issueRowHtml(i){
+ const editing=S.editing&&S.editing.id===i.id?S.editing.field:null;
+ const sevVal=sev(i)||'Not supplied';
+ const sevEditor=editing==='severity'?`<span data-act="noop"><select onchange="A.saveSeverity('${i.id}',this.value)" onblur="A.cancelEdit('${i.id}')">${["Critical","High","Medium","Low"].map(s=>`<option ${i.triage===s?"selected":(!i.triage&&i.severity===s?"selected":"")}>${s}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
+  `<span class="edit-val" data-act="editSeverity" data-arg="${i.id}">${esc(sevVal)}<span class="pencil">✎</span></span>`;
+ const stateEditor=editing==='state'?`<span data-act="noop"><select onchange="A.handleStateChange('${i.id}',this.value)">${["Open","Needs information","Retest required","Open · fix needed","Closed with reason"].map(s=>`<option ${i.state===s?"selected":""}>${s}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
+  `<span class="edit-val" data-act="editState" data-arg="${i.id}">${stag(i.state)}<span class="pencil">✎</span></span>`;
+ const sheetEditor=editing==='sheet'?`<span data-act="noop"><select onchange="A.saveSheet('${i.id}',this.value)">${["Open","Fixed","Fixed?"].map(s=>`<option ${i.sheet===s?"selected":""}>${s}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
+  `<span class="edit-val" data-act="editSheet" data-arg="${i.id}">${esc(i.sheet)}${i.sheet.startsWith("Fixed")&&i.state!=='Verified'?' <span class="tag t-warn">unverified</span>':''}<span class="pencil">✎</span></span>`;
+ const ownerEditor=editing==='owner'?`<span data-act="noop"><select onchange="A.saveOwner('${i.id}',this.value)">${["","Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option value="${s}" ${i.owner===s?"selected":""}>${s||"Unassigned"}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
+  `<span class="edit-val" data-act="editOwner" data-arg="${i.id}">${i.owner?esc(i.owner):'<span class="muted">Unassigned</span>'}<span class="pencil">✎</span></span>`;
+ return `<tr data-issue="${i.id}" class="rowclick" data-act="openIssue" data-arg="${i.id}">
   <td><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button>${i.dupOf?`<br><small class="muted">Duplicate of ${i.dupOf}</small>`:linked(i.id).length?`<br><small class="muted">+${linked(i.id).length} linked report(s)</small>`:""}${i.compliance?'<br><span class="tag t-blue">Disclosure / Compliance</span>':""}</td>
-  <td>${i.call?esc(i.call):'<span class="tag t-warn">No Call ID</span>'}</td><td>${sev(i)?esc(sev(i)):'<span class="tag t-warn">Not supplied</span>'}</td><td>${esc(i.sheet)}${i.flags.length&&i.sheet.startsWith("Fixed")?'<br><span class="tag t-warn">unverified</span>':""}</td><td>${stag(i.state)}</td><td>${i.owner?esc(i.owner):'<span class="muted">Unassigned</span>'}</td></tr>`).join(""):`<tr><td colspan="6"><div class="empty">No issues match these filters.</div></td></tr>`}</tbody></table></div></div>`}
-function issueDetail(){
- const i=byId(S.issueId),cl=CALLS[i.call],ls=linked(i.id);
+  <td>${i.call?esc(i.call):'<span class="tag t-warn">No Call ID</span>'}</td>
+  <td class="editable">${sevEditor}</td>
+  <td class="editable">${sheetEditor}</td>
+  <td class="editable">${stateEditor}</td>
+  <td class="editable">${ownerEditor}</td></tr>`;
+}
+function drawerHtml(i){
+ const cl=CALLS[i.call],ls=linked(i.id);
  const sug=canon().filter(x=>x.id!==i.id&&x.category===i.category&&!i.dupOf);
  const canClose=i.state==="Open · fix needed";
- $("#content").innerHTML=`<div class="head"><div><button class="link" data-act="back">← Back to issues</button><h1 style="margin-top:6px">${i.id} · ${esc(i.title)}</h1><p class="sub">Reported by ${esc(i.reporter)} on ${i.date}${i.dupOf?` · Duplicate of <button class="link" data-act="openIssue" data-arg="${i.dupOf}">${i.dupOf}</button>`:""}</p></div><div>${stag(i.state)}</div></div>
- ${i.flags.map(f=>`<div class="flag">⚠ ${esc(f)}</div>`).join("")}
- ${i.missing.length?`<div class="flag bad">Missing information: ${i.missing.join(", ")}. Add it below to move this out of Needs information.</div>`:""}
- <div class="cols"><section>
-  <div class="panel"><h2 style="margin-bottom:8px">Details</h2>
-   <div class="kv"><span>Call</span><span>${i.call?(cl?`<button class="link" data-act="openCall" data-arg="${i.call}">${i.call}</button>`:`${i.call} <small class="muted">(transcript not supplied)</small>`):`<select onchange="setCall('${i.id}',this.value)"><option value="">Select Call ID…</option>${[...Object.keys(CALLS),...SHEET_ONLY].map(c=>`<option>${c}</option>`).join("")}</select>`}</span></div>
-   <div class="kv"><span>Severity (as supplied)</span><b>${esc(i.severity||"Not supplied")}</b></div>
-   <div class="kv"><span>Triage severity</span><span><select onchange="setTriage('${i.id}',this.value)"><option value="">Not set</option>${["Critical","High","Medium","Low"].map(s=>`<option ${i.triage===s?"selected":""}>${s}</option>`).join("")}</select> <small class="muted">Priya confirms</small></span></div>
-   <div class="kv"><span>Owner</span><span><select onchange="setOwner('${i.id}',this.value)"><option value="">Unassigned</option>${["Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option ${i.owner===s?"selected":""}>${s}</option>`).join("")}</select></span></div>
-   <div class="kv"><span>Category (suggested)</span><b>${esc(i.category)}</b></div>
-   <div class="kv"><span>Sheet status</span><b>${esc(i.sheet)}</b></div>
-   <div class="kv"><span>Fix build</span><b>${esc(i.build||"Not recorded")}</b></div>
-   <div class="kv"><span>Compliance</span><span>${i.compliance?'<span class="tag t-blue">Disclosure / Compliance</span> ':""}<button class="btn" data-act="tagComp" data-arg="${i.id}">${i.compliance?"Remove tag":"Tag as wording issue"}</button></span></div></div>
-  <div class="panel"><h2 style="margin-bottom:8px">Linked reports</h2>
-   ${i.dupOf?`<p class="muted">This report is kept as evidence under ${i.dupOf}.</p>`:ls.length?ls.map(x=>`<div class="row"><span>${x.id} · ${esc(x.title)}<br><small class="muted">${esc(x.call||"No Call ID")} · ${esc(x.reporter)}</small></span></div>`).join(""):'<p class="muted">No linked reports.</p>'}
-   ${!i.dupOf&&sug.length?`<div class="flag">Possible duplicates (same category): ${sug.map(x=>`<button class="link" data-act="link" data-arg="${x.id}|${i.id}">Link ${x.id} under ${i.id}</button>`).join(" · ")}<br><small>Priya confirms each link. Every call and reporter is kept.</small></div>`:""}</div></section>
- <section>
-  <div class="panel"><h2 style="margin-bottom:8px">Actions</h2><div style="display:grid;gap:8px">
+ const lastRt=i.retests.length?i.retests[i.retests.length-1]:null;
+ const rtStatus=!i.retests.length?'Not retested':lastRt.outcome;
+ return `<div class="drawer-head"><div><div class="drawer-title">${i.id} · ${esc(i.title)}</div><div class="drawer-sub">Reported by ${esc(i.reporter)} on ${i.date}${i.dupOf?` · Duplicate of ${i.dupOf}`:""}</div></div><div class="drawer-act">${stag(i.state)} <button class="btn" data-act="closeDrawer">✕</button></div></div>
+ <div class="drawer-body">
+  ${i.flags.map(f=>`<div class="flag">⚠ ${esc(f)}</div>`).join("")}
+  ${i.missing.length?`<div class="flag bad">Missing information: ${i.missing.join(", ")}. Add it below to move this out of Needs information.</div>`:""}
+  <div class="drawer-section"><h3>Issue information</h3>
+   <div class="drawer-kv"><span>Issue ID</span><b>${i.id}</b></div>
+   <div class="drawer-kv"><span>Title</span><b>${esc(i.title)}</b></div>
+   <div class="drawer-kv"><span>Expected behaviour</span><span>${esc(i.expected||"Not supplied")}</span></div>
+   <div class="drawer-kv"><span>Actual behaviour</span><span>${esc(i.actual||"Not supplied")}</span></div>
+   <div class="drawer-kv"><span>Call ID</span><span>${i.call?(cl?`<button class="link" data-act="openCall" data-arg="${i.call}">${i.call}</button>`:`${esc(i.call)} <small class="muted">(transcript not supplied)</small>`):'<span class="tag t-warn">No Call ID</span>'}</span></div>
+   <div class="drawer-kv"><span>Reporter</span><b>${esc(i.reporter)}</b></div>
+   <div class="drawer-kv"><span>Owner</span><b>${i.owner?esc(i.owner):'Unassigned'}</b></div>
+   <div class="drawer-kv"><span>Severity (source)</span><b>${esc(i.severity||"Not supplied")}</b></div>
+   <div class="drawer-kv"><span>Triage severity</span><b>${esc(i.triage||"Not set")}</b></div>
+   <div class="drawer-kv"><span>Category</span><b>${esc(i.category)}</b></div>
+   <div class="drawer-kv"><span>Original sheet status</span><b>${esc(i.sheet)}</b></div>
+   <div class="drawer-kv"><span>Current state</span><b>${stag(i.state)}</b></div></div>
+  <div class="drawer-section"><h3>Evidence</h3>
+   <div class="drawer-kv"><span>Linked Call ID</span><span>${i.call?esc(i.call):'Not supplied'}</span></div>
+   <div class="drawer-kv"><span>Transcript evidence</span><span>${i.evidenceLines&&i.evidenceLines.length?esc(i.evidenceLines.join(", ")):(i.call?'Not recorded':'Original transcript not supplied')}</span></div>
+   <div class="drawer-kv"><span>Post-call record evidence</span><span>${i.call?'See call detail comparison (S03)':'Not supplied'}</span></div></div>
+  <div class="drawer-section"><h3>Vendor handoff</h3>
+   <div class="drawer-kv"><span>Vendor-reported status</span><b>${esc(i.sheet)}</b></div>
+   <div class="drawer-kv"><span>Build / version</span><b>${esc(i.build||"Not recorded")}</b></div>
+   <div class="drawer-kv"><span>Vendor update date</span><b>Not recorded</b></div>
+   <div class="drawer-kv"><span>Handoff history</span><span>${i.flags.length?esc(i.flags.join("; ")):'Not recorded'}</span></div></div>
+  <div class="drawer-section"><h3>Retesting</h3>
+   <div class="drawer-kv"><span>Assigned tester</span><b>${esc(i.assign||"Unassigned")}</b></div>
+   <div class="drawer-kv"><span>Retest status</span><b>${rtStatus}</b></div>
+   <div class="drawer-kv"><span>Build tested</span><b>${esc(lastRt?lastRt.build:(i.build||"Not recorded"))}</b></div>
+   <div class="drawer-kv"><span>Retest notes</span><span>${esc(lastRt?lastRt.notes:"Not supplied")}</span></div>
+   <div class="drawer-kv"><span>Retest history</span><span>${i.retests.length?i.retests.map(r=>esc(r.outcome+" on "+r.build+" by "+r.tester+" ("+r.at+")")).join("; "):'No retest recorded yet.'}</span></div></div>
+  <div class="drawer-section"><h3>Activity history</h3>
+   ${i.hist.length?i.hist.map(h=>`<div class="hist"><b>${esc(h.who)}${h.at?' · '+esc(h.at):''}</b><p>${esc(h.txt)}</p></div>`).join(""):'<div class="empty">No activity recorded yet.</div>'}</div>
+  <div class="drawer-section"><h3>Actions</h3><div style="display:grid;gap:8px">
    <button class="btn soft" data-act="fix" data-arg="${i.id}">Record fix delivered (from Karthik’s email)</button>
    <button class="btn" data-act="toRetest" data-arg="${i.id}">Open in Retest workspace</button>
    <button class="btn ${canClose?"danger":"off"}" data-act="close" data-arg="${i.id}">Close with reason</button>
-   ${canClose?"":'<small class="muted">Closing with a reason is only possible after a failed retest. Verified needs a passing retest.</small>'}</div></div>
-  <div class="panel"><h2 style="margin-bottom:8px">Retest results</h2>${i.retests.length?i.retests.map(r=>`<div class="row"><span><b>${r.outcome}</b> on build ${esc(r.build)}<br><small class="muted">${esc(r.tester)} · ${esc(r.at)} · ${esc(r.notes)}</small></span></div>`).join(""):'<div class="empty">No retest recorded yet.</div>'}</div>
-  <div class="panel"><h2 style="margin-bottom:8px">Activity</h2><div class="hist">${i.hist.map(h=>`<b>${esc(h.who)}</b><p>${esc(h.txt)}</p>`).join("")}</div></div></section></div>`}
+   ${canClose?"":'<small class="muted">Closing with a reason is only possible after a failed retest.</small>'}</div></div>
+  <div class="drawer-section"><h3>Linked reports</h3>
+   ${i.dupOf?`<p class="muted">This report is kept as evidence under ${i.dupOf}.</p>`:ls.length?ls.map(x=>`<div class="row"><span>${x.id} · ${esc(x.title)}<br><small class="muted">${esc(x.call||"No Call ID")} · ${esc(x.reporter)}</small></span></div>`).join(""):'<p class="muted">No linked reports.</p>'}
+   ${!i.dupOf&&sug.length?`<div class="flag">Possible duplicates (same category): ${sug.map(x=>`<button class="link" data-act="link" data-arg="${x.id}|${i.id}">Link ${x.id} under ${i.id}</button>`).join(" · ")}<br><small>Priya confirms each link. Every call and reporter is kept.</small></div>`:""}</div>
+ </div>`;
+}
 /* ===== S05 Retest workspace ===== */
 function s05(){
  const q=ISSUES.filter(i=>i.state==="Retest required"),cur=byId(S.rt)&&byId(S.rt).state==="Retest required"?byId(S.rt):null;
@@ -249,10 +313,21 @@ function s05(){
   <div class="panel"><h2 style="margin-bottom:8px">Result history</h2>${cur.retests.length?cur.retests.map(r=>`<div class="row"><span><b>${r.outcome}</b> on build ${esc(r.build)}<br><small class="muted">${esc(r.tester)} · ${esc(r.at)} · ${esc(r.notes)}</small></span></div>`).join(""):'<div class="empty">No results yet.</div>'}</div>`:'<div class="empty">Select an issue to record a retest result.</div>'}</section></div>`}
 /* ===== Actions ===== */
 const A={
- go(v){S.view=v;S.issueId=null;render()},
- back(){S.issueId=null;render()},
- openCall(id){if(!CALLS[id]){toast("Transcript not supplied in the starter pack.");return}S.callId=id;S.sel=[];S.view="S03";render()},
- openIssue(id){S.issueId=id;S.view="S04";render()},
+ go(v){S.view=v;S.issueId=null;S.drawerOpen=false;render()},
+ back(){S.issueId=null;S.drawerOpen=false;render()},
+closeDrawer(){S.drawerOpen=false;S.issueId=null;const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.classList.remove("show");d.innerHTML=""}if(b)b.classList.remove("show")},
+noop(){},
+editSeverity(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"severity"};updateIssueRow(id)},
+editState(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"state"};updateIssueRow(id)},
+editSheet(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"sheet"};updateIssueRow(id)},
+editOwner(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"owner"};updateIssueRow(id)},
+cancelEdit(id){S.editing=null;updateIssueRow(id)},
+saveSeverity(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);i.triage=v;if(v&&i.missing&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity");if(!i.missing.length&&i.state==="Needs information"){i.state="Open"}}log(i,S.actor,"Severity changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Severity updated.")},
+saveOwner(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);i.owner=v;log(i,S.actor,"Owner set to "+(v||"Unassigned")+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.")},
+handleStateChange(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}if(v==="Closed with reason"){S.editing=null;updateIssueRow(id);A.close(id);return}const i=byId(id);i.state=v;log(i,S.actor,"State changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("State updated.")},
+saveSheet(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.sheet;i.sheet=v;if(v==="Fixed"||v==="Fixed?"){i.sheetUnverified=true;if(i.state!=="Verified"&&(i.state==="Open"||i.state==="Needs information")){i.state="Retest required"}}if(i.state==="Verified"){i.sheetUnverified=false}log(i,S.actor,"Vendor / sheet status changed from "+prev+" to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor status updated.")},
+ openCall(id){if(!CALLS[id]){toast("Transcript not supplied in the starter pack.");return}S.callId=id;S.sel=[];S.drawerOpen=false;S.view="S03";render()},
+ openIssue(id){S.issueId=id;S.drawerOpen=true;if(S.view!=="S04"){S.view="S04";render()}else{const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.innerHTML=drawerHtml(byId(id));d.classList.add("show");if(b)b.classList.add("show")}else{s04()}}},
  pick(id){const k=S.sel.indexOf(id);k<0?S.sel.push(id):S.sel.splice(k,1);s03()},
  clearSel(){S.sel=[];s03()},
  chk(a){const[f,v]=a.split("|");const c=S.checks[S.callId]||(S.checks[S.callId]={});c[f]=c[f]===v?undefined:v;S.reviewed[S.callId]=false;s03()},
@@ -260,7 +335,7 @@ const A={
  report(id){reportModal(typeof id==="string"&&id.startsWith("UAT")?id:(S.view==="S03"?S.callId:""),null)},
  attach(f){const c=CALLS[S.callId],x=c.cmp.find(y=>y.f===f);reportModal(c.id,{title:"Mismatch: "+x.label,lines:x.ls,actual:"Stored "+x.label+": "+x.val+". Transcript lines: "+(x.ls.join(", ")||"none marked")+"."})},
  fix(id){if(!need(isPriya(),"Priya Nair"))return;modal("Record fix delivered",`<p class="muted" style="margin-bottom:10px">Karthik has no login. Priya records the fix from his email. This moves the issue to Retest required, not Verified.</p><div class="form"><label>Build *<input id="fb" placeholder="Build identifier from the vendor's email"></label><label>Source<input value="Karthik S (vendor email)" disabled></label><label class="full">What the vendor said changed<textarea id="fn"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveFix" data-arg="${id}">Save</button>`)},
- saveFix(id){const b=$("#fb").value.trim();if(!b){$("#merr").textContent="Build is required.";return}const i=byId(id);i.build=b;i.state="Retest required";i.assign="";log(i,"Karthik S (recorded by Priya Nair)","Fix delivered in build "+b+". "+$("#fn").value);closeModal();toast("Fix recorded. Retest required.");render()},
+ saveFix(id){const b=$("#fb").value.trim();if(!b){$("#merr").textContent="Build is required.";return}const i=byId(id);i.build=b;i.state="Retest required";i.assign="";log(i,"Karthik S (recorded by Priya Nair)","Fix delivered in build "+b+". "+$("#fn").value);closeModal();toast("Fix recorded. Retest required.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
  toRetest(id){const i=byId(id);if(i.state!=="Retest required"){toast("Record a fix delivered first. Only then can it be retested.");return}S.rt=id;S.view="S05";render()},
  rt(id){S.rt=id;s05()},
  saveRt(id){const i=byId(id),b=$("#rb").value.trim(),n=$("#rn").value.trim();
@@ -272,8 +347,8 @@ const A={
   S.rt=null;render()},
  close(id){const i=byId(id);if(i.state!=="Open · fix needed"){toast("Closing with a reason is only possible after a failed retest.");return}if(!need(isPriya(),"Priya Nair"))return;
   modal("Close with reason",`<p class="muted" style="margin-bottom:10px">The last retest failed. The failed result stays in the history and Rahul is notified.</p><div class="form"><label class="full">Reason for closing *<textarea id="cr" placeholder="Why is it acceptable to close this issue?"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn danger" data-act="saveClose" data-arg="${id}">Close issue</button>`)},
- saveClose(id){const r=$("#cr").value.trim();if(!r){$("#merr").textContent="A reason is required.";return}const i=byId(id);i.state="Closed with reason";i.closeReason=r;log(i,"Priya Nair","Closed with reason after a failed retest: "+r);S.notes.push(id);closeModal();toast("Closed with reason. Rahul notified.");render()},
- tagComp(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);i.compliance=!i.compliance;log(i,"Priya Nair",i.compliance?"Tagged as a wording issue (Disclosure / Compliance).":"Compliance tag removed.");render()},
+ saveClose(id){const r=$("#cr").value.trim();if(!r){$("#merr").textContent="A reason is required.";return}const i=byId(id);i.state="Closed with reason";i.closeReason=r;log(i,"Priya Nair","Closed with reason after a failed retest: "+r);S.notes.push(id);closeModal();toast("Closed with reason. Rahul notified.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
+ tagComp(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);i.compliance=!i.compliance;log(i,"Priya Nair",i.compliance?"Tagged as a wording issue (Disclosure / Compliance).":"Compliance tag removed.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
  link(a){if(!need(isPriya(),"Priya Nair"))return;const[c,p]=a.split("|"),i=byId(c);i.dupOf=p;log(i,"Priya Nair","Linked as a duplicate of "+p+". Call and reporter kept.");log(byId(p),"Priya Nair",c+" linked under this issue.");toast(c+" linked under "+p);render()},
  comp(){if(!need(isPriya(),"Priya Nair"))return;modal("Record Compliance status",`<p class="muted" style="margin-bottom:10px">The review happens outside this workspace. Record what Deepa Iyer confirmed.</p><div class="form"><label>Status<select id="cs"><option ${S.comp.status==="Pending"?"selected":""}>Pending</option><option ${S.comp.status==="Approved"?"selected":""}>Approved</option></select></label><label class="full">Note<textarea id="cn">${esc(S.comp.note)}</textarea></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveComp">Save</button>`)},
  saveComp(){S.comp={status:$("#cs").value,note:$("#cn").value.trim()};closeModal();toast("Compliance status: "+S.comp.status);render()},
@@ -314,14 +389,15 @@ function saveIssue(){
  const call=$("#rc").value,sv=$("#rv2").value,miss=[];if(!call)miss.push("Call ID");if(!sv)miss.push("Severity");
  const id="F"+String(Math.max(...ISSUES.map(i=>+i.id.slice(1)))+1).padStart(2,"0"),cat=$("#rg").value,parent=$("#rd").value;
  const i=mk(id,"New",S.actor,call,t,sv,"—",miss.length?"Needs information":"Open",cat,[[S.actor,"Reported. Evidence lines: "+($("#rl").value||"none")+". Expected: "+($("#rx").value||"not stated")+". Actual: "+a]],[],miss);
+ i.expected=$("#rx").value.trim();i.actual=a;i.evidenceLines=($("#rl").value||"").split(",").map(s=>s.trim()).filter(Boolean);i.sheetUnverified=false;
  i.compliance=cat==="Disclosure / Compliance";if(parent){i.dupOf=parent;log(byId(parent),S.actor,id+" linked under this issue.")}
- ISSUES.unshift(i);S.sel=[];closeModal();toast(id+" saved"+(miss.length?" as Needs information":""));S.issueId=id;S.view="S04";ISSUE_SAVING=false;render()}
+ ISSUES.unshift(i);S.sel=[];closeModal();toast(id+" saved"+(miss.length?" as Needs information":""));S.issueId=id;S.drawerOpen=true;S.view="S04";ISSUE_SAVING=false;render()}
 /* ===== Modal + events ===== */
 function modal(t,b,f){$("#mt").textContent=t;$("#mbody").innerHTML=b;$("#mfoot").innerHTML=f;$("#mbg").classList.add("show")}
 function closeModal(){$("#mbg").classList.remove("show");ISSUE_SAVING=false}
 $("#mbg").onclick=e=>{if(e.target.id==="mbg")closeModal()};
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
-document.addEventListener("keydown",e=>{if(e.key!=="Enter"&&e.key!==" ")return;const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;e.preventDefault();const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(S.drawerOpen){A.closeDrawer();return}closeModal();return}if(e.key!=="Enter"&&e.key!==" ")return;const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;e.preventDefault();const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
 render();
 </script></body></html>
