@@ -133,17 +133,27 @@ mk("F09","4-Nov","Priya Nair","UAT-0163","Asked for a human, not sure callback w
 mk("F10","4-Nov","Anjali Rao","UAT-0172","Agent didn't capture 'don't call again'","","Open","Needs information","Customer preference",[["Source",row("F10","4-Nov","Anjali","UAT-0172","","Open")]],["Severity is missing in the source report. Blank is not low."],["Severity"])
 ];
 /* ===== State ===== */
-const PEOPLE=["Priya Nair","Sameer Khan","Anjali Rao","Rahul Mehta","Deepa Iyer"];
+const PEOPLE=["Priya Nair","Sameer Khan","Anjali Rao","Karthik","Deepa Iyer","Rahul Mehta"];
+const ROLE={"Priya Nair":"UAT Coordinator","Sameer Khan":"UAT Tester","Anjali Rao":"UAT Tester","Karthik":"Vendor Representative","Deepa Iyer":"Compliance Reviewer","Rahul Mehta":"Final Decision Maker"};
+const PERMS={
+ "UAT Coordinator":["calls.view","calls.review","issues.create","issues.view","issues.edit","issues.triage","issues.assign","issues.export","vendor.response","retests.view","retests.assign","retests.submit","readiness.view","readiness.recommend","decision.view","compliance.record"],
+ "UAT Tester":["calls.view","calls.review","issues.create","issues.view.own","retests.view.assigned","retests.submit"],
+ "Vendor Representative":["vendor.issues.view","vendor.response"],
+ "Compliance Reviewer":["compliance.view","compliance.record","readiness.view"],
+ "Final Decision Maker":["readiness.view","decision.submit","decision.view"]
+};
+function can(perm){const r=ROLE[S.actor]||"";return (PERMS[r]||[]).includes(perm)}
+function roleOf(n){return ROLE[n]||""}
 const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,drawerOpen:false,editing:null,rt:null,rtSaving:false,sel:[],selectedIssues:new Set(),exportState:null,handoffs:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const slug=s=>String(s).toLowerCase().replace(/[^a-z]+/g,"-").replace(/-$/,"");
 const stag=s=>`<span class="tag t-${slug(s)}">${esc(s)}</span>`;
 const byId=id=>ISSUES.find(i=>i.id===id);
-const isTester=()=>["Priya Nair","Sameer Khan","Anjali Rao"].includes(S.actor);
+const isTester=()=>roleOf(S.actor)==="UAT Tester";
 const isPriya=()=>S.actor==="Priya Nair";
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),3200)}
 function need(ok,who){if(!ok)toast("This action is for "+who+". Change “Acting as” at the top right.");return ok}
-function log(i,who,txt){i.hist.push({who,txt,at:now()})}
+function log(i,who,txt){i.hist.push({who,txt,at:now(),role:ROLE[who]||""})}
 const canon=()=>ISSUES.filter(i=>!i.dupOf), isOpen=i=>!["Verified","Closed with reason"].includes(i.state);
 const sev=i=>i.triage||i.severity||"";
 const isHigh=i=>["critical","high","p1","urgent"].includes(sev(i).toLowerCase());
@@ -152,16 +162,24 @@ const gateBlocked=()=>tagged().length>0&&S.comp.status!=="Approved";
 const linked=id=>ISSUES.filter(i=>i.dupOf===id);
 const callIssues=id=>ISSUES.filter(i=>i.call===id);
 /* ===== Shell ===== */
-const NAVS=[["S01","Overview / Readiness"],["S02","Test calls"],["S04","Issues"],["S05","Retests"]];
-const TITLES={S01:"Overview / Readiness",S02:"Test Calls",S03:"Call Detail / Report Issue",S04:"Issues",S05:"Retest Workspace"};
+const NAV_BY_ROLE={
+ "UAT Coordinator":[["S01","Overview / Readiness"],["S02","Test Calls"],["S04","Issues"],["S05","Retests"]],
+ "UAT Tester":[["S02","Test Calls"],["S04","My Reported Issues"],["S05","My Retests"]],
+ "Vendor Representative":[["VENDOR","Vendor Issues"]],
+ "Compliance Reviewer":[["COMPLIANCE","Compliance Review"]],
+ "Final Decision Maker":[["S01","Overview / Readiness"],["DECISION","Decision History"]]
+};
+const NAVS=[];
+const TITLES={S01:"Overview / Readiness",S02:"Test Calls",S03:"Call Detail / Report Issue",S04:"Issues",S05:"Retest Workspace",VENDOR:"Vendor Issues",COMPLIANCE:"Compliance Review",DECISION:"Decision History"};
 function shell(){
  const act=S.view==="S03"?"S02":S.view;
- $("#nav").innerHTML=NAVS.map(n=>`<button class="${act===n[0]?"active":""}" data-act="go" data-arg="${n[0]}">${n[1]}<small>${n[0]}</small></button>`).join("");
- $("#actor").innerHTML=PEOPLE.map(p=>`<option ${p===S.actor?"selected":""}>${p}</option>`).join("");
+ const navs=NAV_BY_ROLE[roleOf(S.actor)]||[];
+ $("#nav").innerHTML=navs.map(n=>`<button class="${act===n[0]?"active":""}" data-act="go" data-arg="${n[0]}">${n[1]}<small>${n[0]}</small></button>`).join("");
+ $("#actor").innerHTML=PEOPLE.map(p=>`<option value="${p}" ${p===S.actor?"selected":""}>${p} - ${roleOf(p)}</option>`).join("");
  $("#sid").textContent=S.view+" · "+TITLES[S.view];
  $("#crumb").innerHTML="Northstar Life / <b>"+TITLES[S.view]+"</b>";
 }
-function render(){shell();({S01:s01,S02:s02,S03:s03,S04:s04,S05:s05})[S.view]();window.scrollTo(0,0)}
+function render(){shell();({S01:s01,S02:s02,S03:s03,S04:s04,S05:s05,VENDOR:vendorView,COMPLIANCE:complianceView,DECISION:decisionView})[S.view]();window.scrollTo(0,0)}
 function setActor(v){S.actor=v;render()}
 /* ===== S01 Overview / Readiness ===== */
 function s01(){
@@ -218,7 +236,11 @@ function s03(){
 /* ===== S04 Issues ===== */
 function s04(){
  const q=S.q.issues.toLowerCase(),f=S.q;
- const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));
+ let _rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));
+ if(roleOf(S.actor)==="UAT Tester"){_rows=_rows.filter(i=>i.reporter===S.actor)}
+ if(roleOf(S.actor)==="Vendor Representative"){const shared=new Set();S.handoffs.forEach(h=>h.exportedIds.forEach(id=>shared.add(id)));_rows=_rows.filter(i=>shared.has(i.id))}
+ if(roleOf(S.actor)==="Compliance Reviewer"){_rows=_rows.filter(i=>i.compliance)}
+ const rows=_rows;
  const states=["Open","Needs information","Retest required","Open · fix needed","Verified","Closed with reason"],sevs=[...new Set(ISSUES.map(i=>sev(i)).filter(Boolean)),"Not supplied"];
  $("#content").innerHTML=`<div class="head"><div><h1>Issues</h1><p class="sub">One record per problem. Click any value marked ✎ to edit it inline. Click a title or row to open the detail drawer.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
  <div class="panel"><div class="toolbar"><input class="field" id="iq" placeholder="Search issue or Call ID…" value="${esc(S.q.issues)}" oninput="S.q.issues=this.value;issueList();const e=document.getElementById('iq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
@@ -358,9 +380,51 @@ function drawerHtml(i){
    ${!i.dupOf&&sug.length?`<div class="flag">Possible duplicates (same category): ${sug.map(x=>`<button class="link" data-act="link" data-arg="${x.id}|${i.id}">Link ${x.id} under ${i.id}</button>`).join(" · ")}<br><small>Priya confirms each link. Every call and reporter is kept.</small></div>`:""}</div>
  </div>`;
 }
+function vendorView(){
+ const shared=new Set();S.handoffs.forEach(h=>h.exportedIds.forEach(id=>shared.add(id)));
+ const issues=[...shared].map(byId).filter(Boolean);
+ $("#content").innerHTML=`<div class="head"><div><h1>Vendor Issues</h1><p class="sub">Issues formally shared with the vendor. Karthik can review and respond.</p></div></div>
+ <div class="panel"><div class="tablewrap"><table><thead><tr><th>Issue</th><th>Severity</th><th>State</th><th>Vendor status</th><th>Action</th></tr></thead><tbody>${issues.length?issues.map(i=>`<tr><td>${i.id} - ${esc(i.title)}</td><td>${esc(sev(i)||"Not supplied")}</td><td>${stag(i.state)}</td><td>${esc(i.sheet)}</td><td><button class="btn" data-act="recordVendorResponse" data-arg="${i.id}">Respond</button></td></tr>`).join(""):`<tr><td colspan="5"><div class="empty">No vendor-shared issues yet.</div></td></tr>`}</tbody></table></div></div>
+ <div class="panel"><h2 style="margin-bottom:8px">Handoff history</h2>${S.handoffs.length?S.handoffs.map(h=>`<div class="row"><span>${h.id} - ${h.exportedIds.join(", ")}<br><small class="muted">${esc(h.recipient)} - ${esc(h.exportedAt)} - ${esc(h.status)}</small></span></div>`).join(""):'<div class="empty">No handoffs yet.</div>'}</div>`;
+}
+function complianceView(){
+ const issues=ISSUES.filter(i=>i.compliance);
+ $("#content").innerHTML=`<div class="head"><div><h1>Compliance Review</h1><p class="sub">Issues flagged for disclosure/compliance review. Deepa records the outcome of her external review.</p></div><button class="btn" data-act="comp">Record Compliance status</button></div>
+ <div class="panel"><div class="kv"><span>Compliance status</span><b>${esc(S.comp.status)}</b></div>${S.comp.note?`<div class="kv"><span>Note</span><span>${esc(S.comp.note)}</span></div>`:""}</div>
+ <div class="panel"><div class="tablewrap"><table><thead><tr><th>Issue</th><th>Call</th><th>State</th><th>Compliance</th></tr></thead><tbody>${issues.length?issues.map(i=>`<tr><td>${i.id} - ${esc(i.title)}</td><td>${esc(i.call||"Not supplied")}</td><td>${stag(i.state)}</td><td>${i.compliance?'<span class="tag t-blue">Disclosure / Compliance</span>':''}</td></tr>`).join(""):`<tr><td colspan="4"><div class="empty">No compliance-flagged issues.</div></td></tr>`}</tbody></table></div></div>`;
+}
+function decisionView(){
+ const blockers=ISSUES.filter(i=>!["Verified","Closed with reason"].includes(i.state)&&["critical","high","p1","urgent"].includes((i.triage||i.severity||"").toLowerCase()));
+ $("#content").innerHTML=`<div class="head"><div><h1>Decision History</h1><p class="sub">UAT readiness and Go/No-Go decision. Rahul records the final decision.</p></div></div>
+ <div class="panel"><div class="kv"><span>Open blockers</span><b>${blockers.length}</b></div><div class="kv"><span>Compliance status</span><b>${esc(S.comp.status)}</b></div><div class="kv"><span>Priya recommendation</span><b>${S.rec?S.rec.v:"Not recorded"}</b></div><div class="kv"><span>Rahul decision</span><b>${S.dec?S.dec.v:"Not recorded"}</b></div>
+ ${S.dec?`<div class="kv"><span>Rationale</span><span>${esc(S.dec.why)}</span></div><div class="kv"><span>Recorded by</span><b>${esc(S.dec.by||"Rahul Mehta")} - ${esc(S.dec.at)}</b></div>`:""}
+ <div style="margin-top:10px"><button class="btn primary" data-act="dec">Record Go / No-Go decision</button></div></div>`;
+}
+
 /* ===== S05 Retest workspace ===== */
+function vendorView(){
+ const shared=new Set();S.handoffs.forEach(h=>h.exportedIds.forEach(id=>shared.add(id)));
+ const issues=[...shared].map(byId).filter(Boolean);
+ $("#content").innerHTML=`<div class="head"><div><h1>Vendor Issues</h1><p class="sub">Issues formally shared with the vendor. Karthik can review and respond.</p></div></div>
+ <div class="panel"><div class="tablewrap"><table><thead><tr><th>Issue</th><th>Severity</th><th>State</th><th>Vendor status</th><th>Action</th></tr></thead><tbody>${issues.length?issues.map(i=>`<tr><td>${i.id} - ${esc(i.title)}</td><td>${esc(sev(i)||"Not supplied")}</td><td>${stag(i.state)}</td><td>${esc(i.sheet)}</td><td><button class="btn" data-act="recordVendorResponse" data-arg="${i.id}">Respond</button></td></tr>`).join(""):`<tr><td colspan="5"><div class="empty">No vendor-shared issues yet.</div></td></tr>`}</tbody></table></div></div>
+ <div class="panel"><h2 style="margin-bottom:8px">Handoff history</h2>${S.handoffs.length?S.handoffs.map(h=>`<div class="row"><span>${h.id} - ${h.exportedIds.join(", ")}<br><small class="muted">${esc(h.recipient)} - ${esc(h.exportedAt)} - ${esc(h.status)}</small></span></div>`).join(""):'<div class="empty">No handoffs yet.</div>'}</div>`;
+}
+function complianceView(){
+ const issues=ISSUES.filter(i=>i.compliance);
+ $("#content").innerHTML=`<div class="head"><div><h1>Compliance Review</h1><p class="sub">Issues flagged for disclosure/compliance review. Deepa records the outcome of her external review.</p></div><button class="btn" data-act="comp">Record Compliance status</button></div>
+ <div class="panel"><div class="kv"><span>Compliance status</span><b>${esc(S.comp.status)}</b></div>${S.comp.note?`<div class="kv"><span>Note</span><span>${esc(S.comp.note)}</span></div>`:""}</div>
+ <div class="panel"><div class="tablewrap"><table><thead><tr><th>Issue</th><th>Call</th><th>State</th><th>Compliance</th></tr></thead><tbody>${issues.length?issues.map(i=>`<tr><td>${i.id} - ${esc(i.title)}</td><td>${esc(i.call||"Not supplied")}</td><td>${stag(i.state)}</td><td>${i.compliance?'<span class="tag t-blue">Disclosure / Compliance</span>':''}</td></tr>`).join(""):`<tr><td colspan="4"><div class="empty">No compliance-flagged issues.</div></td></tr>`}</tbody></table></div></div>`;
+}
+function decisionView(){
+ const blockers=ISSUES.filter(i=>!["Verified","Closed with reason"].includes(i.state)&&["critical","high","p1","urgent"].includes((i.triage||i.severity||"").toLowerCase()));
+ $("#content").innerHTML=`<div class="head"><div><h1>Decision History</h1><p class="sub">UAT readiness and Go/No-Go decision. Rahul records the final decision.</p></div></div>
+ <div class="panel"><div class="kv"><span>Open blockers</span><b>${blockers.length}</b></div><div class="kv"><span>Compliance status</span><b>${esc(S.comp.status)}</b></div><div class="kv"><span>Priya recommendation</span><b>${S.rec?S.rec.v:"Not recorded"}</b></div><div class="kv"><span>Rahul decision</span><b>${S.dec?S.dec.v:"Not recorded"}</b></div>
+ ${S.dec?`<div class="kv"><span>Rationale</span><span>${esc(S.dec.why)}</span></div><div class="kv"><span>Recorded by</span><b>${esc(S.dec.at)}</b></div>`:""}
+ <div style="margin-top:10px"><button class="btn primary" data-act="dec">Record Go / No-Go decision</button></div></div>`;
+}
+
 function s05(){
- const q=ISSUES.filter(i=>i.state==="Retest required"),cur=byId(S.rt)&&byId(S.rt).state==="Retest required"?byId(S.rt):null;
+ let q=ISSUES.filter(i=>i.state==="Retest required");if(roleOf(S.actor)==="UAT Tester"){q=q.filter(i=>i.assign===S.actor)};const cur=byId(S.rt)&&byId(S.rt).state==="Retest required"?byId(S.rt):null;
  $("#content").innerHTML=`<div class="head"><div><h1>Retest workspace</h1><p class="sub">A retest is recorded against a named build. Pass is the only route to Verified.</p></div></div>
  <div class="cols"><section><div class="panel"><h2 style="margin-bottom:8px">Awaiting retest</h2>${q.length?`<div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Issue</th><th>Build</th><th>State</th><th>Retest history</th><th>Assigned tester</th></tr></thead><tbody>${q.map(i=>`<tr class="${cur&&cur.id===i.id?"sel":""}"><td><button class="link" data-act="rt" data-arg="${i.id}">${i.id} - ${esc(i.title)}</button></td><td>${esc(i.build||"Not recorded")}</td><td>${stag(i.state)}</td><td>${i.retests.length? (i.retests[i.retests.length-1].outcome==="Fail"?"<span class=\"tag t-bad\">Failed</span>":i.retests[i.retests.length-1].outcome==="Blocked"?"<span class=\"tag t-warn\">Blocked</span>":"<span class=\"tag t-ok\">"+i.retests[i.retests.length-1].outcome+"</span>") :'<span class="tag">Not recorded</span>'}</td><td><select onchange="assign('${i.id}',this.value)"><option value="">Unassigned</option>${["Sameer Khan","Anjali Rao","Priya Nair"].map(s=>`<option ${i.assign===s?"selected":""}>${s}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">No issues awaiting retest. Record a fix delivered on an issue first.</div>'}</div></section>
  <section>${cur?`<div class="panel"><div class="ph"><h2>${cur.id} - ${esc(cur.title)}</h2>${stag(cur.state)}</div>
@@ -387,7 +451,7 @@ function s05(){
  <div class="panel"><h2 style="margin-bottom:8px">Retest history</h2>${cur.retests.length?cur.retests.map((r,idx)=>`<div class="row" style="display:block"><b>Attempt ${idx+1}: ${esc(r.outcome)}</b><br><small class="muted">Tester: ${esc(r.tester)} - Build: ${esc(r.build)} - ${esc(r.at)}</small><br><small>Expected: ${esc(r.expected||"Not supplied")}<br>Actual: ${esc(r.actual||"Not supplied")}<br>Notes: ${esc(r.notes)}</small></div>`).join(""):'<div class="empty">No results yet.</div>'}</div>`:'<div class="empty">Select an issue to record a retest result.</div>'}</section></div>`}
 /* ===== Actions ===== */
 const A={
- go(v){S.view=v;S.issueId=null;S.drawerOpen=false;render()},
+ go(v){const allowed=(NAV_BY_ROLE[roleOf(S.actor)]||[]).map(n=>n[0]);if(!allowed.includes(v)){toast("Access denied.");return}S.view=v;S.issueId=null;S.drawerOpen=false;render()},
  back(){S.issueId=null;S.drawerOpen=false;render()},
 closeDrawer(){S.drawerOpen=false;S.issueId=null;const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.classList.remove("show");d.innerHTML=""}if(b)b.classList.remove("show")},
 noop(){},
@@ -395,34 +459,34 @@ toggleSelect(id,checked){if(checked)S.selectedIssues.add(id);else S.selectedIssu
 toggleSelectAll(checked){const q=S.q.issues.toLowerCase(),f=S.q;const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));rows.forEach(i=>{if(checked)S.selectedIssues.add(i.id);else S.selectedIssues.delete(i.id)});issueList()},
 selectAllFiltered(){const q=S.q.issues.toLowerCase(),f=S.q;const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));rows.forEach(i=>S.selectedIssues.add(i.id));issueList()},
 clearSelection(){S.selectedIssues.clear();issueList()},
-exportPack(){if(S.selectedIssues.size===0){toast("Select at least one issue first.");return}openExportModal()},
+exportPack(){if(!can("issues.export")){toast("Access denied.");return}if(S.selectedIssues.size===0){toast("Select at least one issue first.");return}openExportModal()},
 generateVendorPack(){generateVendorPackImpl()},
 markSent(){markSentImpl()},
-recordVendorResponse(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
+recordVendorResponse(id){if(!can("vendor.response")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")&&!can("vendor.response"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
 saveVendorResponse(id){const i=byId(id);const status=document.getElementById("vr_status").value;const build=document.getElementById("vr_build").value.trim();const comments=document.getElementById("vr_comments").value.trim();i.vendorResponse={status:status,build:build,comments:comments,updatedBy:S.actor,updatedAt:now()};if(build)i.build=build;log(i,S.actor,"Vendor response recorded: "+status+(build?" (build "+build+")":"")+". "+comments);closeModal();if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor response recorded.");render()},
-recordVendorResponse(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
+recordVendorResponse(id){if(!can("vendor.response")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")&&!can("vendor.response"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
 saveVendorResponse(id){const i=byId(id);const status=document.getElementById("vr_status").value;const build=document.getElementById("vr_build").value.trim();const comments=document.getElementById("vr_comments").value.trim();i.vendorResponse={status:status,build:build,comments:comments,updatedBy:S.actor,updatedAt:now()};if(build)i.build=build;log(i,S.actor,"Vendor response recorded: "+status+(build?" (build "+build+")":"")+". "+comments);closeModal();if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor response recorded.");render()},
-editSeverity(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"severity"};updateIssueRow(id)},
-editState(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"state"};updateIssueRow(id)},
-editSheet(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"sheet"};updateIssueRow(id)},
-editOwner(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"owner"};updateIssueRow(id)},
+editSeverity(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"severity"};updateIssueRow(id)},
+editState(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"state"};updateIssueRow(id)},
+editSheet(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"sheet"};updateIssueRow(id)},
+editOwner(id){if(!can("issues.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"owner"};updateIssueRow(id)},
 cancelEdit(id){S.editing=null;updateIssueRow(id)},
-saveSeverity(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);i.triage=v;if(v&&i.missing&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity");if(!i.missing.length&&i.state==="Needs information"){i.state="Open"}}log(i,S.actor,"Severity changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Severity updated.")},
-saveOwner(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,S.actor,"Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.")},
-handleStateChange(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}if(v==="Closed with reason"){S.editing=null;updateIssueRow(id);A.close(id);return}const i=byId(id);i.state=v;log(i,S.actor,"State changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("State updated.")},
-saveSheet(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.sheet;i.sheet=v;if(v==="Fixed"||v==="Fixed?"){i.sheetUnverified=true;if(i.state!=="Verified"&&(i.state==="Open"||i.state==="Needs information")){i.state="Retest required"}}if(i.state==="Verified"){i.sheetUnverified=false}log(i,S.actor,"Vendor / sheet status changed from "+prev+" to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor status updated.")},
- openCall(id){if(!CALLS[id]){toast("Transcript not supplied in the starter pack.");return}S.callId=id;S.sel=[];S.drawerOpen=false;S.view="S03";render()},
- openIssue(id){S.issueId=id;S.drawerOpen=true;if(S.view!=="S04"){S.view="S04";render()}else{const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.innerHTML=drawerHtml(byId(id));d.classList.add("show");if(b)b.classList.add("show")}else{s04()}}},
+saveSeverity(id,v){if(!can("issues.triage")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);i.triage=v;if(v&&i.missing&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity");if(!i.missing.length&&i.state==="Needs information"){i.state="Open"}}log(i,S.actor,"Severity changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Severity updated.")},
+saveOwner(id,v){if(!can("issues.assign")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,S.actor,"Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.")},
+handleStateChange(id,v){if(!can("issues.triage")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}if(v==="Closed with reason"){S.editing=null;updateIssueRow(id);A.close(id);return}const i=byId(id);i.state=v;log(i,S.actor,"State changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("State updated.")},
+saveSheet(id,v){if(!can("issues.triage")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.sheet;i.sheet=v;if(v==="Fixed"||v==="Fixed?"){i.sheetUnverified=true;if(i.state!=="Verified"&&(i.state==="Open"||i.state==="Needs information")){i.state="Retest required"}}if(i.state==="Verified"){i.sheetUnverified=false}log(i,S.actor,"Vendor / sheet status changed from "+prev+" to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor status updated.")},
+ openCall(id){if(!can("calls.view")){toast("Access denied.");return}if(!CALLS[id]){toast("Transcript not supplied in the starter pack.");return}S.callId=id;S.sel=[];S.drawerOpen=false;S.view="S03";render()},
+ openIssue(id){if(!can("issues.view")&&!can("vendor.issues.view")&&!can("compliance.view")){toast("Access denied.");return}S.issueId=id;S.drawerOpen=true;if(S.view!=="S04"){S.view="S04";render()}else{const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.innerHTML=drawerHtml(byId(id));d.classList.add("show");if(b)b.classList.add("show")}else{s04()}}},
  pick(id){const k=S.sel.indexOf(id);k<0?S.sel.push(id):S.sel.splice(k,1);s03()},
  clearSel(){S.sel=[];s03()},
- chk(a){const[f,v]=a.split("|");const c=S.checks[S.callId]||(S.checks[S.callId]={});c[f]=c[f]===v?undefined:v;S.reviewed[S.callId]=false;s03()},
- reviewed(){const c=CALLS[S.callId];if(!c.cmp.every(x=>(S.checks[c.id]||{})[x.f])){toast("Check all three fields before marking this call reviewed.");return}S.reviewed[c.id]=true;toast("Call marked reviewed");s03()},
- report(id){reportModal(typeof id==="string"&&id.startsWith("UAT")?id:(S.view==="S03"?S.callId:""),null)},
+ chk(a){if(!can("calls.review")){toast("Access denied.");return}const[f,v]=a.split("|");const c=S.checks[S.callId]||(S.checks[S.callId]={});c[f]=c[f]===v?undefined:v;S.reviewed[S.callId]=false;s03()},
+ reviewed(){if(!can("calls.review")){toast("Access denied.");return}const c=CALLS[S.callId];if(!c.cmp.every(x=>(S.checks[c.id]||{})[x.f])){toast("Check all three fields before marking this call reviewed.");return}S.reviewed[c.id]=true;toast("Call marked reviewed");s03()},
+ report(id){if(!can("issues.create")){toast("Access denied.");return}reportModal(typeof id==="string"&&id.startsWith("UAT")?id:(S.view==="S03"?S.callId:""),null)},
  attach(f){const c=CALLS[S.callId],x=c.cmp.find(y=>y.f===f);reportModal(c.id,{title:"Mismatch: "+x.label,lines:x.ls,actual:"Stored "+x.label+": "+x.val+". Transcript lines: "+(x.ls.join(", ")||"none marked")+"."})},
- fix(id){if(!need(isPriya(),"Priya Nair"))return;modal("Record fix delivered",`<p class="muted" style="margin-bottom:10px">Karthik has no login. Priya records the fix from his email. This moves the issue to Retest required, not Verified.</p><div class="form"><label>Build *<input id="fb" placeholder="Build identifier from the vendor's email"></label><label>Source<input value="Karthik S (vendor email)" disabled></label><label class="full">What the vendor said changed<textarea id="fn"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveFix" data-arg="${id}">Save</button>`)},
+ fix(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;modal("Record fix delivered",`<p class="muted" style="margin-bottom:10px">Karthik has no login. Priya records the fix from his email. This moves the issue to Retest required, not Verified.</p><div class="form"><label>Build *<input id="fb" placeholder="Build identifier from the vendor's email"></label><label>Source<input value="Karthik S (vendor email)" disabled></label><label class="full">What the vendor said changed<textarea id="fn"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveFix" data-arg="${id}">Save</button>`)},
  saveFix(id){const b=$("#fb").value.trim();if(!b){$("#merr").textContent="Build is required.";return}const i=byId(id);i.build=b;i.state="Retest required";i.assign="";log(i,"Karthik S (recorded by Priya Nair)","Fix delivered in build "+b+". "+$("#fn").value);closeModal();toast("Fix recorded. Retest required.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
- toRetest(id){const i=byId(id);if(i.state!=="Retest required"){toast("Record a fix delivered first. Only then can it be retested.");return}S.rt=id;S.view="S05";render()},
- rt(id){S.rt=id;s05()},
+ toRetest(id){if(!can("retests.view")){toast("Access denied.");return}const i=byId(id);if(i.state!=="Retest required"){toast("Record a fix delivered first. Only then can it be retested.");return}S.rt=id;S.view="S05";render()},
+ rt(id){if(!can("retests.view")){toast("Access denied.");return}S.rt=id;s05()},
  saveRt(id){const i=byId(id);if(S.rtSaving)return;const b=$("#rb").value.trim(),o=$("#ro").value,sc=$("#rs").value.trim(),exp=$("#re").value.trim(),act=$("#ra").value.trim(),n=$("#rn").value.trim();
    if(!isTester()){need(false,"a tester or Priya");return}
    const missing=[];if(!b)missing.push("Build tested");if(!o)missing.push("Outcome");if(!act)missing.push("Actual result");if(o==="Pass"&&!exp)missing.push("Expected result");if(!n)missing.push("Notes");
@@ -432,27 +496,27 @@ saveSheet(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}cons
    log(i,S.actor,"Retest on build "+b+": "+o+". "+n);
    if(o==="Pass"){i.state="Verified";toast("Passed. Issue is Verified.")}else if(o==="Fail"){i.state="Open  ·  fix needed";toast("Failed. Issue reopened as Open / Fix needed.")}else{toast("Blocked. Issue stays in Retest required.")}
    S.rtSaving=false;S.rt=null;render()},
- close(id){const i=byId(id);if(i.state!=="Open · fix needed"){toast("Closing with a reason is only possible after a failed retest.");return}if(!need(isPriya(),"Priya Nair"))return;
+ close(id){if(!can("issues.edit")){toast("Access denied.");return}const i=byId(id);if(i.state!=="Open · fix needed"){toast("Closing with a reason is only possible after a failed retest.");return}if(!need(isPriya(),"Priya Nair"))return;
   modal("Close with reason",`<p class="muted" style="margin-bottom:10px">The last retest failed. The failed result stays in the history and Rahul is notified.</p><div class="form"><label class="full">Reason for closing *<textarea id="cr" placeholder="Why is it acceptable to close this issue?"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn danger" data-act="saveClose" data-arg="${id}">Close issue</button>`)},
  saveClose(id){const r=$("#cr").value.trim();if(!r){$("#merr").textContent="A reason is required.";return}const i=byId(id);i.state="Closed with reason";i.closeReason=r;log(i,"Priya Nair","Closed with reason after a failed retest: "+r);S.notes.push(id);closeModal();toast("Closed with reason. Rahul notified.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
- tagComp(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);i.compliance=!i.compliance;log(i,"Priya Nair",i.compliance?"Tagged as a wording issue (Disclosure / Compliance).":"Compliance tag removed.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
-assignOwner(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Assign owner",`<div class="form"><label>Owner<select id="ao">${["","Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option value="${s}" ${i.owner===s?"selected":""}>${s||"Unassigned"}</option>`).join("")}</select></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" onclick="A.saveAssignOwner('${id}')">Save</button>`)},
+ tagComp(id){if(!can("issues.triage")&&!can("compliance.record")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);i.compliance=!i.compliance;log(i,"Priya Nair",i.compliance?"Tagged as a wording issue (Disclosure / Compliance).":"Compliance tag removed.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
+assignOwner(id){if(!can("issues.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Assign owner",`<div class="form"><label>Owner<select id="ao">${["","Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option value="${s}" ${i.owner===s?"selected":""}>${s||"Unassigned"}</option>`).join("")}</select></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" onclick="A.saveAssignOwner('${id}')">Save</button>`)},
 saveAssignOwner(id){const v=document.getElementById("ao").value;const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,S.actor,"Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");closeModal();updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.");render()},
- link(a){if(!need(isPriya(),"Priya Nair"))return;const[c,p]=a.split("|"),i=byId(c);i.dupOf=p;log(i,"Priya Nair","Linked as a duplicate of "+p+". Call and reporter kept.");log(byId(p),"Priya Nair",c+" linked under this issue.");toast(c+" linked under "+p);render()},
- comp(){if(!need(isPriya(),"Priya Nair"))return;modal("Record Compliance status",`<p class="muted" style="margin-bottom:10px">The review happens outside this workspace. Record what Deepa Iyer confirmed.</p><div class="form"><label>Status<select id="cs"><option ${S.comp.status==="Pending"?"selected":""}>Pending</option><option ${S.comp.status==="Approved"?"selected":""}>Approved</option></select></label><label class="full">Note<textarea id="cn">${esc(S.comp.note)}</textarea></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveComp">Save</button>`)},
+ link(a){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;const[c,p]=a.split("|"),i=byId(c);i.dupOf=p;log(i,"Priya Nair","Linked as a duplicate of "+p+". Call and reporter kept.");log(byId(p),"Priya Nair",c+" linked under this issue.");toast(c+" linked under "+p);render()},
+ comp(){if(!can("compliance.record")&&!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")&&!can("compliance.record"))return;modal("Record Compliance status",`<p class="muted" style="margin-bottom:10px">The review happens outside this workspace. Record what Deepa Iyer confirmed.</p><div class="form"><label>Status<select id="cs"><option ${S.comp.status==="Pending"?"selected":""}>Pending</option><option ${S.comp.status==="Approved"?"selected":""}>Approved</option></select></label><label class="full">Note<textarea id="cn">${esc(S.comp.note)}</textarea></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveComp">Save</button>`)},
  saveComp(){S.comp={status:$("#cs").value,note:$("#cn").value.trim()};closeModal();toast("Compliance status: "+S.comp.status);render()},
- rec(){if(!need(isPriya(),"Priya Nair"))return;modal("UAT recommendation",`<div class="form"><label>Recommendation<select id="rv"><option>Go</option><option>Conditional go</option><option>No-go</option></select></label><label class="full">Rationale *<textarea id="rw"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveRec">Save</button>`)},
+ rec(){if(!can("readiness.recommend")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;modal("UAT recommendation",`<div class="form"><label>Recommendation<select id="rv"><option>Go</option><option>Conditional go</option><option>No-go</option></select></label><label class="full">Rationale *<textarea id="rw"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveRec">Save</button>`)},
  saveRec(){const w=$("#rw").value.trim();if(!w){$("#merr").textContent="A rationale is required.";return}S.rec={v:$("#rv").value,why:w,at:now()};closeModal();render()},
- dec(){if(!need(S.actor==="Rahul Mehta","Rahul Mehta"))return;if(!S.rec){toast("Priya must record her recommendation first.");return}
+ dec(){if(!can("decision.submit")){toast("Access denied.");return}if(!need(S.actor==="Rahul Mehta","Rahul Mehta"))return;if(!S.rec){toast("Priya must record her recommendation first.");return}
   modal("Go / No-go decision",`<div class="flag">${canon().filter(i=>isOpen(i)&&isHigh(i)).length} open blocker(s) and ${canon().filter(i=>i.state==="Retest required").length} retest(s) awaiting verification.</div><div class="form"><label>Decision<select id="dv"><option>Go</option><option>Conditional go</option><option>No-go</option></select></label><label class="full">Rationale, including accepted risks *<textarea id="dw"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveDec">Record decision</button>`)},
- saveDec(){const v=$("#dv").value,w=$("#dw").value.trim();if(v!=="No-go"&&gateBlocked()){$("#merr").textContent="Sign-off blocked: Compliance has not approved the wording issue(s) tagged in this release.";return}if(!w){$("#merr").textContent="A rationale is required.";return}S.dec={v,why:w,at:now()};closeModal();toast("Decision recorded: "+v);render()},
+ saveDec(){const v=$("#dv").value,w=$("#dw").value.trim();if(v!=="No-go"&&gateBlocked()){$("#merr").textContent="Sign-off blocked: Compliance has not approved the wording issue(s) tagged in this release.";return}if(!w){$("#merr").textContent="A rationale is required.";return}S.dec={v,why:w,at:now(),by:S.actor};closeModal();toast("Decision recorded: "+v);render()},
  closeModal(){closeModal()}
 };
 function now(){return new Date().toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
 function setTriage(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);i.triage=v;log(i,"Priya Nair","Triage severity set to "+(v||"Not set")+".");if(v&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity")}fixNeeds(i);render()}
 function setCall(id,v){const i=byId(id);if(!v)return;i.call=v;log(i,S.actor,"Call ID added: "+v+".");i.missing=i.missing.filter(m=>m!=="Call ID");fixNeeds(i);render()}
-function setOwner(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,"Priya Nair","Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");render()}
-function assign(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.assign||"Unassigned";i.assign=v;if(v){i.owner=v}log(i,"Priya Nair","Retest assigned to "+(v||"nobody")+". Owner updated to "+(v||i.owner)+".");s05()}
+function setOwner(id,v){if(!can("issues.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,"Priya Nair","Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");render()}
+function assign(id,v){if(!can("retests.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.assign||"Unassigned";i.assign=v;if(v){i.owner=v}log(i,"Priya Nair","Retest assigned to "+(v||"nobody")+". Owner updated to "+(v||i.owner)+".");s05()}
 function fixNeeds(i){if(!i.missing.length&&i.state==="Needs information"){i.state="Open";log(i,"Tool","All missing information supplied. State set to Open.")}}
 /* ===== Report issue ===== */
 const CATS=["Date accuracy","Payment handling","Voice quality","Conversation flow","Callback","Customer preference","Disclosure / Compliance","Other"];
@@ -472,6 +536,7 @@ function reportModal(call,pre){
 function similar(){const c=$("#rc").value,g=$("#rg").value,s=canon().filter(i=>i.category===g||(c&&i.call===c));$("#rd").innerHTML='<option value="">Create as a new issue</option>'+s.map(i=>`<option value="${i.id}">Link as duplicate of ${i.id} · ${esc(i.title)}</option>`).join("")}
 let ISSUE_SAVING=false;
 function saveIssue(){
+ if(!can("issues.create")){toast("Access denied.");return}
  if(ISSUE_SAVING)return;
  const t=$("#rt").value.trim(),a=$("#ra2").value.trim(),call=$("#rc").value;
  if(!t||!a){$("#merr").textContent="Title and actual behaviour are required.";return}
