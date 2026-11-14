@@ -134,7 +134,7 @@ mk("F10","4-Nov","Anjali Rao","UAT-0172","Agent didn't capture 'don't call again
 ];
 /* ===== State ===== */
 const PEOPLE=["Priya Nair","Sameer Khan","Anjali Rao","Rahul Mehta","Deepa Iyer"];
-const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,drawerOpen:false,editing:null,rt:null,sel:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
+const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,drawerOpen:false,editing:null,rt:null,sel:[],selectedIssues:new Set(),exportState:null,handoffs:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const slug=s=>String(s).toLowerCase().replace(/[^a-z]+/g,"-").replace(/-$/,"");
 const stag=s=>`<span class="tag t-${slug(s)}">${esc(s)}</span>`;
@@ -224,30 +224,85 @@ function s04(){
  <div class="panel"><div class="toolbar"><input class="field" id="iq" placeholder="Search issue or Call ID…" value="${esc(S.q.issues)}" oninput="S.q.issues=this.value;issueList();const e=document.getElementById('iq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
  <select class="field" onchange="S.q.state=this.value;issueList()"><option value="">All states</option>${states.map(s=>`<option ${f.state===s?"selected":""}>${s}</option>`).join("")}</select>
  <select class="field" onchange="S.q.sev=this.value;issueList()"><option value="">All severity</option>${sevs.map(s=>`<option ${f.sev===s?"selected":""}>${s}</option>`).join("")}</select></div>
- <div class="tablewrap"><table><thead><tr><th>Issue</th><th>Call</th><th>Severity</th><th>Sheet status</th><th>State</th><th>Owner</th></tr></thead><tbody id="issuetbody">${rows.length?rows.map(i=>issueRowHtml(i)).join(""):`<tr><td colspan="6"><div class="empty">No issues match these filters.</div></td></tr>`}</tbody></table></div></div>
+ <div class="toolbar" style="margin-top:8px"><span class="muted">${S.selectedIssues.size} selected</span> <button class="btn" data-act="selectAllFiltered">Select all filtered</button> <button class="btn" data-act="clearSelection">Clear selection</button> <button class="btn primary" data-act="exportPack">Export Vendor Pack</button></div>
+ <div class="tablewrap"><table><thead><tr><th><input type="checkbox" data-act="toggleSelectAll" ${allFilteredSelected()?"checked":""}></th><th>Issue</th><th>Call</th><th>Severity</th><th>Sheet status</th><th>State</th><th>Owner</th></tr></thead><tbody id="issuetbody">${rows.length?rows.map(i=>issueRowHtml(i)).join(""):`<tr><td colspan="7"><div class="empty">No issues match these filters.</div></td></tr>`}</tbody></table></div></div>
  <div class="drawer-backdrop ${S.drawerOpen?'show':''}" data-act="closeDrawer"></div>
  <div class="drawer ${S.drawerOpen?'show':''}" id="issuedrawer">${S.drawerOpen&&S.issueId?drawerHtml(byId(S.issueId)):''}</div>`}
 function issueList(){s04()}
 function updateIssueRow(id){const i=byId(id);const old=document.querySelector('tr[data-issue="'+id+'"]');if(!old)return;const tmp=document.createElement('tbody');tmp.innerHTML=issueRowHtml(i);const nw=tmp.firstElementChild;if(nw)old.replaceWith(nw)}
+function allFilteredSelected(){const q=S.q.issues.toLowerCase(),f=S.q;const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));return rows.length>0&&rows.every(i=>S.selectedIssues.has(i.id))}
+function csvEscape(v){const s=String(v??"");if(/[",\n]/.test(s))return '"' + s.replace(/"/g,'""') + '"';return s}
+function exportExcluded(i){if(i.dupOf)return true;if(["Needs information","Verified","Closed with reason"].includes(i.state))return true;if(i.state==="Retest required")return true;return false}
+function rtStatusOf(i){return i.retests.length?i.retests[i.retests.length-1].outcome:"Not retested"}
+function rtNotesOf(i){return i.retests.length?i.retests[i.retests.length-1].notes:"Not supplied"}
+function vendorResponseText(i){return i.vendorResponse?i.vendorResponse.status:"Not supplied"}
+function buildVersionOf(i){return (i.vendorResponse&&i.vendorResponse.build)||i.build||"Not supplied"}
+function handoffForIssue(id){return S.handoffs.find(h=>h.exportedIds.includes(id))}
+function exportHandoffHtml(i){const h=handoffForIssue(i.id);if(!h)return "<p class=\"muted\">Not included in any vendor export yet.</p>";return "<div class=\"drawer-kv\"><span>Included in export</span><b>Yes</b></div><div class=\"drawer-kv\"><span>Handoff ID</span><b>"+h.id+"</b></div><div class=\"drawer-kv\"><span>Export date</span><b>"+esc(h.exportedAt)+"</b></div><div class=\"drawer-kv\"><span>Handoff status</span><b>"+esc(h.status)+"</b></div>"}
+function openExportModal(){
+ const ids=[...S.selectedIssues];
+ const excluded=ids.map(byId).filter(exportExcluded);
+ const listHtml=ids.map(function(id){const i=byId(id);return "<div class=\"row\"><span>"+i.id+" · "+esc(i.title)+"<br><small class=\"muted\">"+esc(i.call||"Not supplied")+" · "+esc(sev(i)||"Not supplied")+(exportExcluded(i)?" · <span class=\"tag t-warn\">excluded by default</span>":"")+"</small></span></div>"}).join("");
+ const warn=excluded.length?"<div class=\"flag bad\">Warning: "+excluded.length+" selected issue(s) are normally excluded from vendor export. Confirm to include them.</div>":"";
+ const body="<p class=\"muted\" style=\"margin-bottom:10px\">"+ids.length+" issue(s) selected.</p>"+warn+"<div class=\"panel\" style=\"max-height:220px;overflow:auto\">"+listHtml+"</div><div class=\"kv\"><span>Recipient</span><b>Karthik (vendor)</b></div><div class=\"kv\"><span>Format</span><b>CSV</b></div><div class=\"form\" style=\"margin-top:10px\"><label><input type=\"checkbox\" id=\"incEvidence\" checked> Include evidence (transcript line references)</label></div>";
+ const footer="<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.generateVendorPack()\">Generate Vendor Pack</button>";
+ modal("Export Vendor Pack",body,footer);
+}
+function generateVendorPackImpl(){
+ const ids=[...S.selectedIssues];
+ if(ids.length===0){toast("Select at least one issue.");return}
+ const excluded=ids.map(byId).filter(exportExcluded);
+ if(excluded.length && !confirm("Some selected issues are normally excluded from vendor export. Include them anyway?"))return;
+ const incEl=document.getElementById("incEvidence");
+ const incEvidence=incEl?incEl.checked:true;
+ const date=new Date().toISOString().slice(0,10);
+ const filename="Northstar_UAT_Vendor_Issue_Pack_"+date+".csv";
+ const headers=["Issue ID","Call ID","Issue Title","Issue Description","Expected Behaviour","Actual Behaviour","Severity","Category","Transcript Evidence / Line References","Post-call Evidence","Reported By","Assigned Owner","Vendor Status","Current Issue State","Retest Status","Retest Notes","Vendor Response","Build Version"];
+ const rows=ids.map(function(id){
+  const i=byId(id);
+  const ev=incEvidence?(i.evidenceLines&&i.evidenceLines.length?i.evidenceLines.join("; "):(i.call?"Not supplied":"Original transcript not supplied")):"Not supplied";
+  return [i.id,i.call||"Not supplied",i.title,"Not supplied",i.expected||"Not supplied",i.actual||"Not supplied",sev(i)||"Not supplied",i.category||"Not supplied",ev,"Not supplied",i.reporter||"Not supplied",i.owner||"Not supplied",i.sheet||"Not supplied",i.state,rtStatusOf(i),rtNotesOf(i),vendorResponseText(i),buildVersionOf(i)];
+ });
+ const csv=headers.map(csvEscape).join(",")+"\n"+rows.map(function(r){return r.map(csvEscape).join(",")}).join("\n");
+ const blob=new Blob([csv],{type:"text/csv"});
+ const url=URL.createObjectURL(blob);
+ const handoffId="HO-"+String(S.handoffs.length+1).padStart(3,"0");
+ const preparedAt=now();
+ S.handoffs.push({id:handoffId,exportedIds:ids,recipient:"Karthik",exportedAt:preparedAt,filename:filename,status:"Prepared",sentAt:null,sentBy:null});
+ const email="Subject: Northstar Life - UAT Issues for Resolution\n\nHi Karthik,\n\nPlease find attached the latest Northstar Life UAT issue report.\n\nThe report contains the issues reviewed by our team that require vendor investigation and resolution.\n\nSelected issues ("+ids.length+"): "+ids.join(", ")+".\n\nPlease review each issue and share:\n\n- Root cause, where identified.\n- Resolution status.\n- Fixed build/version details.\n- Any issues that require additional information from our team.\n\nOnce the updated build is available, we will coordinate retesting and share the results.\n\nPlease ensure that each issue is addressed individually so we can track its resolution.\n\nRegards,\nPriya Nair\nUAT Coordinator\nNorthstar Life";
+ S.exportState={ids:ids,filename:filename,csvUrl:url,email:email,handoffId:handoffId,preparedAt:preparedAt};
+ const bodyHtml="<div class=\"flag ok\">Vendor issue pack generated successfully.</div><p class=\"muted\" style=\"margin-bottom:10px\">"+ids.length+" issue(s) exported: "+ids.join(", ")+"</p><div class=\"kv\"><span>File</span><b>"+filename+"</b></div><div class=\"kv\"><span>Handoff ID</span><b>"+handoffId+"</b></div><div class=\"kv\"><span>Status</span><b>Prepared</b></div><div style=\"margin-top:12px;display:grid;gap:8px\"><button class=\"btn primary\" onclick=\"downloadExportCsv()\">Download Issue Report (CSV)</button><button class=\"btn\" onclick=\"downloadEmailDraft()\">Download Email Draft</button><button class=\"btn\" onclick=\"copyEmailDraft()\">Copy Email</button><button class=\"btn danger\" data-act=\"markSent\">Mark as Sent</button></div><p class=\"muted\" style=\"margin-top:10px;font-size:12px\">Priya must attach the CSV manually when sending the email. Mark as Sent only after the email is actually sent.</p>";
+ modal("Vendor Pack Generated",bodyHtml,"<button class=\"btn\" data-act=\"closeModal\">Close</button>");
+}
+function downloadExportCsv(){if(!S.exportState)return;const a=document.createElement("a");a.href=S.exportState.csvUrl;a.download=S.exportState.filename;a.click();toast("CSV downloaded.")}
+function downloadEmailDraft(){if(!S.exportState)return;const blob=new Blob([S.exportState.email],{type:"text/plain"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Northstar_UAT_Vendor_Email_Draft_"+new Date().toISOString().slice(0,10)+".txt";a.click();URL.revokeObjectURL(url);toast("Email draft downloaded.")}
+function copyEmailDraft(){if(!S.exportState)return;navigator.clipboard.writeText(S.exportState.email).then(function(){toast("Email copied to clipboard.")}).catch(function(){toast("Copy failed; select the text manually.")})}
+function markSentImpl(){if(!S.exportState)return;if(!confirm("Confirm that you have manually sent the email to Karthik?"))return;const ho=S.handoffs.find(function(h){return h.id===S.exportState.handoffId});if(ho){ho.status="Sent";ho.sentAt=now();ho.sentBy=S.actor}S.exportState.status="Sent";toast("Handoff marked as Sent.");modal("Vendor Pack Sent","<div class=\"flag ok\">Handoff "+S.exportState.handoffId+" marked as Sent.</div><p class=\"muted\">Priya manually sent the email outside the application.</p>","<button class=\"btn\" data-act=\"closeModal\">Close</button>")}
 function issueRowHtml(i){
  const editing=S.editing&&S.editing.id===i.id?S.editing.field:null;
- const sevVal=sev(i)||'Not supplied';
- const sevEditor=editing==='severity'?`<span data-act="noop"><select onchange="A.saveSeverity('${i.id}',this.value)" onblur="A.cancelEdit('${i.id}')">${["Critical","High","Medium","Low"].map(s=>`<option ${i.triage===s?"selected":(!i.triage&&i.severity===s?"selected":"")}>${s}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
-  `<span class="edit-val" data-act="editSeverity" data-arg="${i.id}">${esc(sevVal)}<span class="pencil">✎</span></span>`;
- const stateEditor=editing==='state'?`<span data-act="noop"><select onchange="A.handleStateChange('${i.id}',this.value)">${["Open","Needs information","Retest required","Open · fix needed","Closed with reason"].map(s=>`<option ${i.state===s?"selected":""}>${s}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
-  `<span class="edit-val" data-act="editState" data-arg="${i.id}">${stag(i.state)}<span class="pencil">✎</span></span>`;
- const sheetEditor=editing==='sheet'?`<span data-act="noop"><select onchange="A.saveSheet('${i.id}',this.value)">${["Open","Fixed","Fixed?"].map(s=>`<option ${i.sheet===s?"selected":""}>${s}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
-  `<span class="edit-val" data-act="editSheet" data-arg="${i.id}">${esc(i.sheet)}${i.sheet.startsWith("Fixed")&&i.state!=='Verified'?' <span class="tag t-warn">unverified</span>':''}<span class="pencil">✎</span></span>`;
- const ownerEditor=editing==='owner'?`<span data-act="noop"><select onchange="A.saveOwner('${i.id}',this.value)">${["","Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option value="${s}" ${i.owner===s?"selected":""}>${s||"Unassigned"}</option>`).join("")}<option value="__cancel">Cancel</option></select></span>`:
-  `<span class="edit-val" data-act="editOwner" data-arg="${i.id}">${i.owner?esc(i.owner):'<span class="muted">Unassigned</span>'}<span class="pencil">✎</span></span>`;
- return `<tr data-issue="${i.id}" class="rowclick" data-act="openIssue" data-arg="${i.id}">
-  <td><button class="link" data-act="openIssue" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button>${i.dupOf?`<br><small class="muted">Duplicate of ${i.dupOf}</small>`:linked(i.id).length?`<br><small class="muted">+${linked(i.id).length} linked report(s)</small>`:""}${i.compliance?'<br><span class="tag t-blue">Disclosure / Compliance</span>':""}</td>
-  <td>${i.call?esc(i.call):'<span class="tag t-warn">No Call ID</span>'}</td>
-  <td class="editable">${sevEditor}</td>
-  <td class="editable">${sheetEditor}</td>
-  <td class="editable">${stateEditor}</td>
-  <td class="editable">${ownerEditor}</td></tr>`;
+ const sevVal=sev(i)||"Not supplied";
+ const sevEditor=editing==="severity"
+  ? "<span data-act=\"noop\"><select onchange=\"A.saveSeverity('"+i.id+"',this.value)\">" + ["Critical","High","Medium","Low"].map(function(s){return "<option"+(i.triage===s?" selected":((!i.triage&&i.severity===s)?" selected":""))+">"+s+"</option>"}).join("") + "<option value=\"__cancel\">Cancel</option></select></span>"
+  : "<span class=\"edit-val\" data-act=\"editSeverity\" data-arg=\""+i.id+"\">"+esc(sevVal)+"<span class=\"pencil\">+</span></span>";
+ const stateEditor=editing==="state"
+  ? "<span data-act=\"noop\"><select onchange=\"A.handleStateChange('"+i.id+"',this.value)\">" + ["Open","Needs information","Retest required","Open - fix needed","Closed with reason"].map(function(s){return "<option"+(i.state===s?" selected":"")+">"+s+"</option>"}).join("") + "<option value=\"__cancel\">Cancel</option></select></span>"
+  : "<span class=\"edit-val\" data-act=\"editState\" data-arg=\""+i.id+"\">"+stag(i.state)+"<span class=\"pencil\">+</span></span>";
+ const sheetEditor=editing==="sheet"
+  ? "<span data-act=\"noop\"><select onchange=\"A.saveSheet('"+i.id+"',this.value)\">" + ["Open","Fixed","Fixed?"].map(function(s){return "<option"+(i.sheet===s?" selected":"")+">"+s+"</option>"}).join("") + "<option value=\"__cancel\">Cancel</option></select></span>"
+  : "<span class=\"edit-val\" data-act=\"editSheet\" data-arg=\""+i.id+"\">"+esc(i.sheet)+(i.sheet.startsWith("Fixed")&&i.state!=="Verified"?" <span class=\"tag t-warn\">unverified</span>":"")+"<span class=\"pencil\">+</span></span>";
+ const ownerEditor=editing==="owner"
+  ? "<span data-act=\"noop\"><select onchange=\"A.saveOwner('"+i.id+"',this.value)\">" + ["","Priya Nair","Sameer Khan","Anjali Rao"].map(function(s){return "<option value=\""+s+"\""+(i.owner===s?" selected":"")+">"+(s||"Unassigned")+"</option>"}).join("") + "<option value=\"__cancel\">Cancel</option></select></span>"
+  : "<span class=\"edit-val\" data-act=\"editOwner\" data-arg=\""+i.id+"\">"+(i.owner?esc(i.owner):"<span class=\"muted\">Unassigned</span>")+"<span class=\"pencil\">+</span></span>";
+ return "<tr data-issue=\""+i.id+"\" class=\"rowclick\" data-act=\"openIssue\" data-arg=\""+i.id+"\">" +
+  "<td><span data-act=\"noop\"><input type=\"checkbox\" "+(S.selectedIssues.has(i.id)?"checked":"")+" onchange=\"A.toggleSelect(+i.id+,this.checked)\" onclick=\"event.stopPropagation()\"></span></td>" +
+  "<td><button class=\"link\" data-act=\"openIssue\" data-arg=\""+i.id+"\">"+i.id+" - "+esc(i.title)+"</button></td>" +
+  "<td>"+(i.call?esc(i.call):"<span class=\"tag t-warn\">No Call ID</span>")+"</td>" +
+  "<td class=\"editable\">"+sevEditor+"</td>" +
+  "<td class=\"editable\">"+sheetEditor+"</td>" +
+  "<td class=\"editable\">"+stateEditor+"</td>" +
+  "<td class=\"editable\">"+ownerEditor+"</td></tr>";
 }
+
 function drawerHtml(i){
  const cl=CALLS[i.call],ls=linked(i.id);
  const sug=canon().filter(x=>x.id!==i.id&&x.category===i.category&&!i.dupOf);
@@ -280,6 +335,14 @@ function drawerHtml(i){
    <div class="drawer-kv"><span>Build / version</span><b>${esc(i.build||"Not recorded")}</b></div>
    <div class="drawer-kv"><span>Vendor update date</span><b>Not recorded</b></div>
    <div class="drawer-kv"><span>Handoff history</span><span>${i.flags.length?esc(i.flags.join("; ")):'Not recorded'}</span></div></div>
+  <div class="drawer-section"><h3>Export handoff</h3>
+   ${exportHandoffHtml(i)}
+   <div style="margin-top:8px"><button class="btn soft" data-act="recordVendorResponse" data-arg="${i.id}">Record vendor response</button></div>
+   ${i.vendorResponse?'<div class="drawer-kv"><span>Vendor response</span><b>'+esc(i.vendorResponse.status)+'</b></div><div class="drawer-kv"><span>Build version</span><b>'+esc(i.vendorResponse.build||"Not supplied")+'</b></div><div class="drawer-kv"><span>Vendor comments</span><span>'+esc(i.vendorResponse.comments||"Not supplied")+'</span></div><div class="drawer-kv"><span>Updated by</span><b>'+esc(i.vendorResponse.updatedBy)+' - '+esc(i.vendorResponse.updatedAt)+'</b></div>':''}</div>
+  <div class="drawer-section"><h3>Export handoff</h3>
+   ${exportHandoffHtml(i)}
+   <div style="margin-top:8px"><button class="btn soft" data-act="recordVendorResponse" data-arg="${i.id}">Record vendor response</button></div>
+   ${i.vendorResponse?'<div class="drawer-kv"><span>Vendor response</span><b>'+esc(i.vendorResponse.status)+'</b></div><div class="drawer-kv"><span>Build version</span><b>'+esc(i.vendorResponse.build||"Not supplied")+'</b></div><div class="drawer-kv"><span>Vendor comments</span><span>'+esc(i.vendorResponse.comments||"Not supplied")+'</span></div><div class="drawer-kv"><span>Updated by</span><b>'+esc(i.vendorResponse.updatedBy)+' · '+esc(i.vendorResponse.updatedAt)+'</b></div>':''}</div>
   <div class="drawer-section"><h3>Retesting</h3>
    <div class="drawer-kv"><span>Assigned tester</span><b>${esc(i.assign||"Unassigned")}</b></div>
    <div class="drawer-kv"><span>Retest status</span><b>${rtStatus}</b></div>
@@ -318,6 +381,17 @@ const A={
  back(){S.issueId=null;S.drawerOpen=false;render()},
 closeDrawer(){S.drawerOpen=false;S.issueId=null;const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.classList.remove("show");d.innerHTML=""}if(b)b.classList.remove("show")},
 noop(){},
+toggleSelect(id,checked){if(checked)S.selectedIssues.add(id);else S.selectedIssues.delete(id);const c=document.querySelector(".toolbar .muted");if(c)c.textContent=S.selectedIssues.size+" selected";const hdr=document.querySelector("thead input[type=checkbox]");if(hdr)hdr.checked=allFilteredSelected()},
+toggleSelectAll(checked){const q=S.q.issues.toLowerCase(),f=S.q;const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));rows.forEach(i=>{if(checked)S.selectedIssues.add(i.id);else S.selectedIssues.delete(i.id)});issueList()},
+selectAllFiltered(){const q=S.q.issues.toLowerCase(),f=S.q;const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));rows.forEach(i=>S.selectedIssues.add(i.id));issueList()},
+clearSelection(){S.selectedIssues.clear();issueList()},
+exportPack(){if(S.selectedIssues.size===0){toast("Select at least one issue first.");return}openExportModal()},
+generateVendorPack(){generateVendorPackImpl()},
+markSent(){markSentImpl()},
+recordVendorResponse(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
+saveVendorResponse(id){const i=byId(id);const status=document.getElementById("vr_status").value;const build=document.getElementById("vr_build").value.trim();const comments=document.getElementById("vr_comments").value.trim();i.vendorResponse={status:status,build:build,comments:comments,updatedBy:S.actor,updatedAt:now()};if(build)i.build=build;log(i,S.actor,"Vendor response recorded: "+status+(build?" (build "+build+")":"")+". "+comments);closeModal();if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor response recorded.");render()},
+recordVendorResponse(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
+saveVendorResponse(id){const i=byId(id);const status=document.getElementById("vr_status").value;const build=document.getElementById("vr_build").value.trim();const comments=document.getElementById("vr_comments").value.trim();i.vendorResponse={status:status,build:build,comments:comments,updatedBy:S.actor,updatedAt:now()};if(build)i.build=build;log(i,S.actor,"Vendor response recorded: "+status+(build?" (build "+build+")":"")+". "+comments);closeModal();if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor response recorded.");render()},
 editSeverity(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"severity"};updateIssueRow(id)},
 editState(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"state"};updateIssueRow(id)},
 editSheet(id){if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"sheet"};updateIssueRow(id)},
