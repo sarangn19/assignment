@@ -294,7 +294,7 @@ function issueRowHtml(i){
   ? "<span data-act=\"noop\"><select onchange=\"A.saveOwner('"+i.id+"',this.value)\">" + ["","Priya Nair","Sameer Khan","Anjali Rao"].map(function(s){return "<option value=\""+s+"\""+(i.owner===s?" selected":"")+">"+(s||"Unassigned")+"</option>"}).join("") + "<option value=\"__cancel\">Cancel</option></select></span>"
   : "<span class=\"edit-val\" data-act=\"editOwner\" data-arg=\""+i.id+"\">"+(i.owner?esc(i.owner):"<span class=\"muted\">Unassigned</span>")+"<span class=\"pencil\">+</span></span>";
  return "<tr data-issue=\""+i.id+"\" class=\"rowclick\" data-act=\"openIssue\" data-arg=\""+i.id+"\">" +
-  "<td><span data-act=\"noop\"><input type=\"checkbox\" "+(S.selectedIssues.has(i.id)?"checked":"")+" onchange=\"A.toggleSelect(+i.id+,this.checked)\" onclick=\"event.stopPropagation()\"></span></td>" +
+  "<td><span data-act=\"noop\"><input type=\"checkbox\" "+(S.selectedIssues.has(i.id)?"checked":"")+" onchange=\"A.toggleSelect('"+i.id+"',this.checked)\" onclick=\"event.stopPropagation()\"></span></td>" +
   "<td><button class=\"link\" data-act=\"openIssue\" data-arg=\""+i.id+"\">"+i.id+" - "+esc(i.title)+"</button></td>" +
   "<td>"+(i.call?esc(i.call):"<span class=\"tag t-warn\">No Call ID</span>")+"</td>" +
   "<td class=\"editable\">"+sevEditor+"</td>" +
