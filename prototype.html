@@ -51,6 +51,24 @@ tr.sel td{background:#f5f8ff}tr.dim td{color:#98a2b3}
 .selbar{position:sticky;bottom:0;background:#fff;border:1px solid var(--blue);border-radius:11px;padding:9px 12px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 @media(max-width:900px){.app{grid-template-columns:1fr}.side{flex-direction:row;flex-wrap:wrap;padding:10px}.side-note{display:none}.nav{display:flex;flex-wrap:wrap}.grid,.cols{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.top{padding:0 14px}.content{padding:18px 14px 60px}}
 @media(max-width:560px){.form{grid-template-columns:1fr}.kv{grid-template-columns:1fr}}
+/* transcript & interaction improvements */
+.tr-panel{max-height:70vh;overflow:auto;padding-right:6px}
+.tline{display:grid;grid-template-columns:74px 104px 1fr;gap:10px;align-items:start;padding:10px 12px;border:1px solid transparent;border-radius:10px;margin:6px 0;cursor:pointer;transition:background .12s,border-color .12s}
+.tline:hover{background:#f8faff;border-color:#e3e8ff}
+.tline.sel{background:#eef2ff;border-color:var(--blue)}
+.tline .tid{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--blue);font-weight:700}
+.tline .spk{font-weight:700;font-size:13px}
+.tline .spk.asha{color:var(--blue)}
+.tline .spk.cust{color:var(--green)}
+.tline .txt{font-size:14.5px;line-height:1.6;color:#202b3c}
+.tline.sel .txt{color:var(--ink)}
+.clickrow{cursor:pointer}
+.clickrow:hover td{background:#f5f8ff}
+.cmp .status{display:inline-block;font-size:11px;padding:2px 8px;border-radius:12px;margin-left:6px;font-weight:700}
+.cmp .status.unchecked{background:#f1f1ef;color:#787774}
+.cmp .status.match{background:#dbeddb;color:#448361}
+.cmp .status.mismatch{background:#ffe2dd;color:#d44c47}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
 </style></head><body>
 <div class="app">
 <aside class="side"><div class="brand"><span class="mark">N</span>Northstar Life</div>
@@ -156,20 +174,20 @@ function s02(){
  $("#content").innerHTML=`<div class="head"><div><h1>Test calls</h1><p class="sub">Open a call to compare what was said with what the system stored.</p></div></div>
  <div class="panel"><div class="toolbar"><input class="field" id="cq" placeholder="Search call ID, customer, tester…" value="${esc(S.q.calls)}" oninput="S.q.calls=this.value;s02();document.getElementById('cq').focus();const e=document.getElementById('cq');e.setSelectionRange(e.value.length,e.value.length)"></div>
  <div class="tablewrap"><table><thead><tr><th>Call ID</th><th>Customer (played by)</th><th>Tester</th><th>Date</th><th>Language</th><th>Review</th><th>Linked issues</th></tr></thead><tbody>${rows.length?rows.map(r=>{const n=callIssues(r.id).length;
-  return r.full?`<tr><td><button class="link" data-act="openCall" data-arg="${r.id}">${r.id}</button></td><td>${esc(r.c.customer)}</td><td>${esc(r.c.tester)}</td><td>${r.c.date}</td><td>${esc(r.c.lang)}</td><td>${S.reviewed[r.id]?stag("Verified").replace("Verified","Reviewed"):'<span class="tag t-warn">Not reviewed</span>'}</td><td>${n}</td></tr>`
-  :`<tr class="dim"><td>${r.id}</td><td colspan="4">Transcript not supplied in the starter pack</td><td><span class="tag">—</span></td><td>${n?`<button class="link" data-act="openIssue" data-arg="${callIssues(r.id)[0].id}">${n} (${callIssues(r.id).map(i=>i.id).join(", ")})</button>`:0}</td></tr>`}).join(""):`<tr><td colspan="7"><div class="empty">No calls match your search.</div></td></tr>`}</tbody></table></div></div>`}
+  return r.full?`<tr class="clickrow" data-act="openCall" data-arg="${r.id}" tabindex="0" role="button" aria-label="Open call ${r.id}"><td><button class="link" data-act="openCall" data-arg="${r.id}" tabindex="-1">${r.id}</button></td><td>${esc(r.c.customer)}</td><td>${esc(r.c.tester)}</td><td>${r.c.date}</td><td>${esc(r.c.lang)}</td><td>${S.reviewed[r.id]?'<span class="tag t-ok">Reviewed</span>':'<span class="tag t-warn">Not reviewed</span>'}</td><td>${n}</td></tr>`
+  :`<tr class="dim"><td>${r.id}</td><td colspan="4">Transcript not supplied in the starter pack</td><td><span class="tag">—</span></td><td>${n?`<button class="link" data-act="openIssue" data-arg="${callIssues(r.id)[0].id}">${n} (${callIssues(r.id).map(i=>i.id).join(", ")})</button>`:0}</td></tr>`}).join(""):`<tr><td colspan="7"><div class="empty-state">No calls match your search.</div></td></tr>`}</tbody></table></div></div>`}
 /* ===== S03 Call detail / Report issue ===== */
 function s03(){
  const c=CALLS[S.callId],ck=S.checks[c.id]||(S.checks[c.id]={}),lines=Object.fromEntries(c.lines.map(l=>[l[0],l]));
  const all=c.cmp.every(x=>ck[x.f]),mm=c.cmp.filter(x=>ck[x.f]==="mm").length;
- $("#content").innerHTML=`<div class="head"><div><button class="link" data-act="go" data-arg="S02">← Back to test calls</button><h1 style="margin-top:6px">${c.id} · ${esc(c.customer)}</h1><p class="sub">${esc(c.date)} · Tester ${esc(c.tester)} · ${esc(c.lang)}</p></div><div>${S.reviewed[c.id]?'<span class="tag t-ok">Reviewed</span> ':""}<button class="btn primary" data-act="report" data-arg="${c.id}">＋ Report issue</button></div></div>
+ $("#content").innerHTML=`<div class="head"><div><button class="link" data-act="go" data-arg="S02">← Back to test calls</button><h1 style="margin-top:6px">${c.id} · ${esc(c.customer)}</h1><p class="sub">${esc(c.date)} · Tester ${esc(c.tester)} · ${esc(c.lang)} · Review status: ${S.reviewed[c.id]?'Reviewed':'Not reviewed'}</p></div><div>${S.reviewed[c.id]?'<span class="tag t-ok">Reviewed</span> ':''}<button class="btn primary" data-act="report" data-arg="${c.id}">＋ Report issue</button></div></div>
  <div class="cols"><section><div class="panel"><div class="ph"><h2>Transcript</h2><small class="muted">Click lines to use them as evidence</small></div>
-  ${c.lines.map(l=>`<div class="line ${S.sel.includes(l[0])?"picked":""}" data-act="pick" data-arg="${l[0]}"><b>${l[0]}</b><span><strong>${l[1]}</strong> — ${esc(l[2])}</span></div>`).join("")}
+  <div class="tr-panel">${c.lines.map(l=>`<div class="tline ${S.sel.includes(l[0])?"sel":""}" data-act="pick" data-arg="${l[0]}" role="button" aria-pressed="${S.sel.includes(l[0])}" aria-label="Transcript line ${l[0]}"><span class="tid">${l[0]}</span><span class="spk ${l[1]==="Asha"?"asha":"cust"}">${esc(l[1])}</span><span class="txt">${esc(l[2])}</span></div>`).join("")}</div>
   ${S.sel.length?`<div class="selbar"><span>${S.sel.length} line(s) selected: ${S.sel.join(", ")}</span><span><button class="btn" data-act="clearSel">Clear</button> <button class="btn primary" data-act="report" data-arg="${c.id}">Report issue from selection</button></span></div>`:""}</div></section>
  <section><div class="panel"><h2 style="margin-bottom:8px">Post-call record (stored by the system)</h2>
   <div class="kv"><span>Disposition</span><b>${esc(c.post.disposition)}</b></div><div class="kv"><span>Lead record: due_date</span><b>${esc(c.post.due_date)}</b></div><div class="kv"><span>Callback requested</span><b>${esc(c.post.callback)}</b></div></div>
   <div class="panel"><div class="ph"><h2>Compare transcript with record</h2><small class="muted">Every call needs this check</small></div>
-  ${c.cmp.map(x=>{const st=ck[x.f];return `<div class="cmp ${st==="mm"?"mm":st==="ok"?"okc":""}"><div class="ph" style="margin:0"><b>${x.label}</b><span class="sv">${esc(x.val)}</span></div>
+  ${c.cmp.map(x=>{const st=ck[x.f];const statusLabel=st==="ok"?"Matches":st==="mm"?"Mismatch":"Not checked";const statusClass=st==="ok"?"match":st==="mm"?"mismatch":"unchecked";return `<div class="cmp ${st==="mm"?"mm":st==="ok"?"okc":""}"><div class="ph" style="margin:0"><b>${x.label}</b><span class="sv">${esc(x.val)}</span><span class="status ${statusClass}">${statusLabel}</span></div>
    ${x.ls.length?x.ls.map(id=>`<q><b>${id}</b> ${esc(lines[id][2])}</q>`).join(""):'<q class="muted">No related transcript lines marked.</q>'}
    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn ${st==="ok"?"soft":""}" data-act="chk" data-arg="${x.f}|ok">Matches</button><button class="btn ${st==="mm"?"danger":""}" data-act="chk" data-arg="${x.f}|mm">Mismatch</button>${st==="mm"?`<button class="btn primary" data-act="attach" data-arg="${x.f}">Attach to a new issue</button>`:""}</div></div>`}).join("")}
   ${mm?`<div class="flag bad">${mm} mismatch(es) flagged. Priya sees them in the issue queue once reported.</div>`:""}
@@ -237,7 +255,7 @@ const A={
  openIssue(id){S.issueId=id;S.view="S04";render()},
  pick(id){const k=S.sel.indexOf(id);k<0?S.sel.push(id):S.sel.splice(k,1);s03()},
  clearSel(){S.sel=[];s03()},
- chk(a){const[f,v]=a.split("|"),c=S.checks[S.callId];c[f]=c[f]===v?undefined:v;S.reviewed[S.callId]=false;s03()},
+ chk(a){const[f,v]=a.split("|");const c=S.checks[S.callId]||(S.checks[S.callId]={});c[f]=c[f]===v?undefined:v;S.reviewed[S.callId]=false;s03()},
  reviewed(){const c=CALLS[S.callId];if(!c.cmp.every(x=>(S.checks[c.id]||{})[x.f])){toast("Check all three fields before marking this call reviewed.");return}S.reviewed[c.id]=true;toast("Call marked reviewed");s03()},
  report(id){reportModal(typeof id==="string"&&id.startsWith("UAT")?id:(S.view==="S03"?S.callId:""),null)},
  attach(f){const c=CALLS[S.callId],x=c.cmp.find(y=>y.f===f);reportModal(c.id,{title:"Mismatch: "+x.label,lines:x.ls,actual:"Stored "+x.label+": "+x.val+". Transcript lines: "+(x.ls.join(", ")||"none marked")+"."})},
@@ -288,18 +306,22 @@ function reportModal(call,pre){
  <div class="flag" style="margin-top:10px">Missing a Call ID or severity? You can still save. The report is kept as Needs information.</div><div class="err" id="merr"></div>`,
  `<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" onclick="saveIssue()">Save report</button>`);similar()}
 function similar(){const c=$("#rc").value,g=$("#rg").value,s=canon().filter(i=>i.category===g||(c&&i.call===c));$("#rd").innerHTML='<option value="">Create as a new issue</option>'+s.map(i=>`<option value="${i.id}">Link as duplicate of ${i.id} · ${esc(i.title)}</option>`).join("")}
+let ISSUE_SAVING=false;
 function saveIssue(){
+ if(ISSUE_SAVING)return;
  const t=$("#rt").value.trim(),a=$("#ra2").value.trim();if(!t||!a){$("#merr").textContent="Title and actual behaviour are required.";return}
+ ISSUE_SAVING=true;const btn=document.querySelector('#mfoot .btn.primary');if(btn)btn.disabled=true;
  const call=$("#rc").value,sv=$("#rv2").value,miss=[];if(!call)miss.push("Call ID");if(!sv)miss.push("Severity");
  const id="F"+String(Math.max(...ISSUES.map(i=>+i.id.slice(1)))+1).padStart(2,"0"),cat=$("#rg").value,parent=$("#rd").value;
  const i=mk(id,"New",S.actor,call,t,sv,"—",miss.length?"Needs information":"Open",cat,[[S.actor,"Reported. Evidence lines: "+($("#rl").value||"none")+". Expected: "+($("#rx").value||"not stated")+". Actual: "+a]],[],miss);
  i.compliance=cat==="Disclosure / Compliance";if(parent){i.dupOf=parent;log(byId(parent),S.actor,id+" linked under this issue.")}
- ISSUES.unshift(i);S.sel=[];closeModal();toast(id+" saved"+(miss.length?" as Needs information":""));S.issueId=id;S.view="S04";render()}
+ ISSUES.unshift(i);S.sel=[];closeModal();toast(id+" saved"+(miss.length?" as Needs information":""));S.issueId=id;S.view="S04";ISSUE_SAVING=false;render()}
 /* ===== Modal + events ===== */
 function modal(t,b,f){$("#mt").textContent=t;$("#mbody").innerHTML=b;$("#mfoot").innerHTML=f;$("#mbg").classList.add("show")}
-function closeModal(){$("#mbg").classList.remove("show")}
+function closeModal(){$("#mbg").classList.remove("show");ISSUE_SAVING=false}
 $("#mbg").onclick=e=>{if(e.target.id==="mbg")closeModal()};
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
+document.addEventListener("keydown",e=>{if(e.key!=="Enter"&&e.key!==" ")return;const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;e.preventDefault();const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
 render();
 </script></body></html>
