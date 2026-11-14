@@ -119,7 +119,9 @@ const CALLS={
 const SHEET_ONLY=["UAT-0149","UAT-0150","UAT-0165","UAT-0168","UAT-0171","UAT-0172"];
 const E2='Karthik (E2, 3 Nov): "#1 and #2 are fixed in today\'s build. For #4 we\'ve increased the end-of-call wait time. Please retest."';
 const row=(id,d,t,c,s,st)=>`Sheet row ${id} · ${d} · ${t} · ${c||"no Call ID"} · severity ${s||"blank"} · status ${st}`;
-const mk=(id,d,rep,call,title,sev,sheet,state,cat,hist,flags,missing)=>({id,date:d,reporter:rep,call,title,severity:sev,sheet,state,category:cat,owner:rep||"",triage:"",dupOf:null,compliance:false,build:"",retests:[],assign:"",flags:flags||[],missing:missing||[],hist:hist.map(h=>({who:h[0],txt:h[1]}))});
+const mk=(id,d,rep,call,title,sev,sheet,state,cat,hist,flags,missing)=>({id,date:d,reporter:rep,reporterId:empId(rep),call,title,severity:sev,sheet,state,category:cat,owner:rep||"",ownerId:empId(rep||""),triage:"",dupOf:null,compliance:false,build:"",retests:[],assign:"",flags:flags||[],missing:missing||[],hist:hist.map(h=>({who:h[0],txt:h[1]}))});
+const EMP_ID={"Priya Nair":"E-PRIYA","Sameer Khan":"E-SAMEER","Anjali Rao":"E-ANJALI","Karthik":"E-KARTHIK","Deepa Iyer":"E-DEEPA","Rahul Mehta":"E-RAHUL"};
+function empId(n){return EMP_ID[n]||n}
 let ISSUES=[
 mk("F01","2-Nov","Priya Nair","UAT-0142","Wrong due date read out","High","Fixed","Open · fix needed","Date accuracy",[["Source",row("F01","2-Nov","Priya","UAT-0142","High","Fixed")],["E2",E2],["E3","Sameer (4 Nov): first retest call had the correct date; on the second call (UAT-0171) it said March again. \"Is this fixed or not?\""],["Tool","State set to Open · fix needed because a retest failed (E3, F08)."]],["Sheet says Fixed, but a later retest failed (E3, F08)."]),
 mk("F02","2-Nov","Priya Nair","UAT-0150","Hindi speech too fast","Medium","Fixed","Retest required","Voice quality",[["Source",row("F02","2-Nov","Priya","UAT-0150","Medium","Fixed")],["E2",E2]],["Sheet says Fixed; no retest result in the pack."]),
@@ -144,6 +146,36 @@ const PERMS={
 };
 function can(perm){const r=ROLE[S.actor]||"";return (PERMS[r]||[]).includes(perm)}
 function roleOf(n){return ROLE[n]||""}
+function canViewCall(user,callId){
+ if(roleOf(user)==="UAT Coordinator")return true;
+ if(roleOf(user)==="Compliance Reviewer"){return ISSUES.some(i=>i.call===callId&&i.compliance)}
+ const id=empId(user);
+ if(CALL_ASSIGN[callId]==null)return false;
+ return CALL_ASSIGN[callId]===id;
+}
+function getVisibleCalls(user){
+ return [...Object.keys(CALLS),...SHEET_ONLY].filter(cid=>canViewCall(user,cid));
+}
+function canViewIssue(user,issue){
+ if(!issue)return false;
+ if(roleOf(user)==="UAT Coordinator")return true;
+ if(roleOf(user)==="Vendor Representative"){const shared=new Set();S.handoffs.forEach(h=>h.exportedIds.forEach(x=>shared.add(x)));return shared.has(issue.id)}
+ if(roleOf(user)==="Compliance Reviewer")return !!issue.compliance;
+ if(roleOf(user)==="Final Decision Maker")return false;
+ const id=empId(user);
+ return issue.reporterId===id || issue.ownerId===id;
+}
+function getVisibleIssues(user){
+ return ISSUES.filter(i=>canViewIssue(user,i));
+}
+function canViewRetest(user,issue){
+ if(roleOf(user)==="UAT Coordinator")return true;
+ const id=empId(user);
+ return issue.assign===user || issue.ownerId===id || issue.reporterId===id;
+}
+const CALL_ASSIGN={};
+Object.values(CALLS).forEach(c=>{CALL_ASSIGN[c.id]=empId(c.tester)});
+SHEET_ONLY.forEach(cid=>{const linkedIssue=ISSUES.find(i=>i.call===cid);CALL_ASSIGN[cid]=linkedIssue&&["Sameer Khan","Anjali Rao","Priya Nair"].includes(linkedIssue.reporter)?empId(linkedIssue.reporter):null});
 const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,drawerOpen:false,editing:null,rt:null,rtSaving:false,sel:[],selectedIssues:new Set(),exportState:null,handoffs:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const slug=s=>String(s).toLowerCase().replace(/[^a-z]+/g,"-").replace(/-$/,"");
@@ -180,7 +212,7 @@ function shell(){
  $("#crumb").innerHTML="Northstar Life / <b>"+TITLES[S.view]+"</b>";
 }
 function render(){shell();({S01:s01,S02:s02,S03:s03,S04:s04,S05:s05,VENDOR:vendorView,COMPLIANCE:complianceView,DECISION:decisionView})[S.view]();window.scrollTo(0,0)}
-function setActor(v){S.actor=v;render()}
+function setActor(v){S.actor=v;S.drawerOpen=false;S.issueId=null;const allowed=(NAV_BY_ROLE[roleOf(v)]||[]).map(n=>n[0]);if(!allowed.includes(S.view)){S.view=allowed[0]||"S01"};render()}
 /* ===== S01 Overview / Readiness ===== */
 function s01(){
  const c=canon(),open=c.filter(isOpen),blockers=open.filter(isHigh),triage=open.filter(i=>!sev(i)||i.state==="Needs information"),await_=c.filter(i=>i.state==="Retest required"),over=ISSUES.filter(i=>i.state==="Closed with reason"),tg=tagged(),gb=gateBlocked();
@@ -210,12 +242,13 @@ function s01(){
 /* ===== S02 Test calls ===== */
 function s02(){
  const q=S.q.calls.toLowerCase();
- const rows=[...Object.values(CALLS).map(c=>({id:c.id,full:true,c})),...SHEET_ONLY.map(id=>({id,full:false}))].filter(r=>!q||(r.id+(r.c?r.c.customer+r.c.tester:"")).toLowerCase().includes(q));
+ const visibleCalls=getVisibleCalls(S.actor);
+ const rows=[...Object.values(CALLS).map(c=>({id:c.id,full:true,c})),...SHEET_ONLY.map(id=>({id,full:false}))].filter(r=>visibleCalls.includes(r.id)).filter(r=>!q||(r.id+(r.c?r.c.customer+r.c.tester:"")).toLowerCase().includes(q));
  $("#content").innerHTML=`<div class="head"><div><h1>Test calls</h1><p class="sub">Open a call to compare what was said with what the system stored.</p></div></div>
  <div class="panel"><div class="toolbar"><input class="field" id="cq" placeholder="Search call ID, customer, tester…" value="${esc(S.q.calls)}" oninput="S.q.calls=this.value;s02();document.getElementById('cq').focus();const e=document.getElementById('cq');e.setSelectionRange(e.value.length,e.value.length)"></div>
- <div class="tablewrap"><table><thead><tr><th>Call ID</th><th>Customer (played by)</th><th>Tester</th><th>Date</th><th>Language</th><th>Review</th><th>Linked issues</th></tr></thead><tbody>${rows.length?rows.map(r=>{const n=callIssues(r.id).length;
-  return r.full?`<tr class="clickrow" data-act="openCall" data-arg="${r.id}" tabindex="0" role="button" aria-label="Open call ${r.id}"><td><button class="link" data-act="openCall" data-arg="${r.id}" tabindex="-1">${r.id}</button></td><td>${esc(r.c.customer)}</td><td>${esc(r.c.tester)}</td><td>${r.c.date}</td><td>${esc(r.c.lang)}</td><td>${S.reviewed[r.id]?'<span class="tag t-ok">Reviewed</span>':'<span class="tag t-warn">Not reviewed</span>'}</td><td>${n}</td></tr>`
-  :`<tr class="dim"><td>${r.id}</td><td colspan="4">Transcript not supplied in the starter pack</td><td><span class="tag">—</span></td><td>${n?`<button class="link" data-act="openIssue" data-arg="${callIssues(r.id)[0].id}">${n} (${callIssues(r.id).map(i=>i.id).join(", ")})</button>`:0}</td></tr>`}).join(""):`<tr><td colspan="7"><div class="empty-state">No calls match your search.</div></td></tr>`}</tbody></table></div></div>`}
+ <div class="tablewrap"><table><thead><tr><th>Call ID</th><th>Customer (played by)</th><th>Tester</th><th>Assigned tester</th><th>Date</th><th>Language</th><th>Review</th><th>Linked issues</th></tr></thead><tbody>${rows.length?rows.map(r=>{const n=callIssues(r.id).length;
+  return r.full?`<tr class="clickrow" data-act="openCall" data-arg="${r.id}" tabindex="0" role="button" aria-label="Open call ${r.id}"><td><button class="link" data-act="openCall" data-arg="${r.id}" tabindex="-1">${r.id}</button></td><td>${esc(r.c.customer)}</td><td>${esc(r.c.tester)}</td><td>${can("calls.assign")?`<select onchange="assignCall('${r.id}',this.value)"><option value="">Unassigned</option>${["Sameer Khan","Anjali Rao","Priya Nair"].map(s=>`<option ${CALL_ASSIGN[r.id]===empId(s)?"selected":""}>${s}</option>`).join("")}</select>`:esc(PEOPLE.find(p=>empId(p)===CALL_ASSIGN[r.id])||"Unassigned")}</td><td>${r.c.date}</td><td>${esc(r.c.lang)}</td><td>${S.reviewed[r.id]?'<span class="tag t-ok">Reviewed</span>':'<span class="tag t-warn">Not reviewed</span>'}</td><td>${n}</td></tr>`
+  :`<tr class="dim"><td>${r.id}</td><td colspan="4">Transcript not supplied in the starter pack</td><td><span class="tag">—</span></td><td>${esc(PEOPLE.find(p=>empId(p)===CALL_ASSIGN[r.id])||"Unassigned")}</td><td>${n?`<button class="link" data-act="openIssue" data-arg="${callIssues(r.id)[0].id}">${n} (${callIssues(r.id).map(i=>i.id).join(", ")})</button>`:0}</td></tr>`}).join(""):`<tr><td colspan="8"><div class="empty-state">No calls match your search.</div></td></tr>`}</tbody></table></div></div>`}
 /* ===== S03 Call detail / Report issue ===== */
 function s03(){
  const c=CALLS[S.callId],ck=S.checks[c.id]||(S.checks[c.id]={}),lines=Object.fromEntries(c.lines.map(l=>[l[0],l]));
@@ -240,7 +273,7 @@ function s04(){
  if(roleOf(S.actor)==="UAT Tester"){_rows=_rows.filter(i=>i.reporter===S.actor)}
  if(roleOf(S.actor)==="Vendor Representative"){const shared=new Set();S.handoffs.forEach(h=>h.exportedIds.forEach(id=>shared.add(id)));_rows=_rows.filter(i=>shared.has(i.id))}
  if(roleOf(S.actor)==="Compliance Reviewer"){_rows=_rows.filter(i=>i.compliance)}
- const rows=_rows;
+ const rows=getVisibleIssues(S.actor).filter(i=>_rows.includes(i));
  const states=["Open","Needs information","Retest required","Open · fix needed","Verified","Closed with reason"],sevs=[...new Set(ISSUES.map(i=>sev(i)).filter(Boolean)),"Not supplied"];
  $("#content").innerHTML=`<div class="head"><div><h1>Issues</h1><p class="sub">One record per problem. Click any value marked ✎ to edit it inline. Click a title or row to open the detail drawer.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
  <div class="panel"><div class="toolbar"><input class="field" id="iq" placeholder="Search issue or Call ID…" value="${esc(S.q.issues)}" oninput="S.q.issues=this.value;issueList();const e=document.getElementById('iq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
@@ -424,7 +457,7 @@ function decisionView(){
 }
 
 function s05(){
- let q=ISSUES.filter(i=>i.state==="Retest required");if(roleOf(S.actor)==="UAT Tester"){q=q.filter(i=>i.assign===S.actor)};const cur=byId(S.rt)&&byId(S.rt).state==="Retest required"?byId(S.rt):null;
+ let q=ISSUES.filter(i=>i.state==="Retest required");if(roleOf(S.actor)==="UAT Tester"){q=q.filter(i=>i.assign===S.actor||i.ownerId===empId(S.actor))};const cur=byId(S.rt)&&byId(S.rt).state==="Retest required"?byId(S.rt):null;
  $("#content").innerHTML=`<div class="head"><div><h1>Retest workspace</h1><p class="sub">A retest is recorded against a named build. Pass is the only route to Verified.</p></div></div>
  <div class="cols"><section><div class="panel"><h2 style="margin-bottom:8px">Awaiting retest</h2>${q.length?`<div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Issue</th><th>Build</th><th>State</th><th>Retest history</th><th>Assigned tester</th></tr></thead><tbody>${q.map(i=>`<tr class="${cur&&cur.id===i.id?"sel":""}"><td><button class="link" data-act="rt" data-arg="${i.id}">${i.id} - ${esc(i.title)}</button></td><td>${esc(i.build||"Not recorded")}</td><td>${stag(i.state)}</td><td>${i.retests.length? (i.retests[i.retests.length-1].outcome==="Fail"?"<span class=\"tag t-bad\">Failed</span>":i.retests[i.retests.length-1].outcome==="Blocked"?"<span class=\"tag t-warn\">Blocked</span>":"<span class=\"tag t-ok\">"+i.retests[i.retests.length-1].outcome+"</span>") :'<span class="tag">Not recorded</span>'}</td><td><select onchange="assign('${i.id}',this.value)"><option value="">Unassigned</option>${["Sameer Khan","Anjali Rao","Priya Nair"].map(s=>`<option ${i.assign===s?"selected":""}>${s}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">No issues awaiting retest. Record a fix delivered on an issue first.</div>'}</div></section>
  <section>${cur?`<div class="panel"><div class="ph"><h2>${cur.id} - ${esc(cur.title)}</h2>${stag(cur.state)}</div>
@@ -472,11 +505,11 @@ editSheet(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(
 editOwner(id){if(!can("issues.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"owner"};updateIssueRow(id)},
 cancelEdit(id){S.editing=null;updateIssueRow(id)},
 saveSeverity(id,v){if(!can("issues.triage")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);i.triage=v;if(v&&i.missing&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity");if(!i.missing.length&&i.state==="Needs information"){i.state="Open"}}log(i,S.actor,"Severity changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Severity updated.")},
-saveOwner(id,v){if(!can("issues.assign")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,S.actor,"Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.")},
+saveOwner(id,v){if(!can("issues.assign")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;i.ownerId=empId(v);log(i,S.actor,"Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.")},
 handleStateChange(id,v){if(!can("issues.triage")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}if(v==="Closed with reason"){S.editing=null;updateIssueRow(id);A.close(id);return}const i=byId(id);i.state=v;log(i,S.actor,"State changed to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("State updated.")},
 saveSheet(id,v){if(!can("issues.triage")){toast("Access denied.");return}if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}const i=byId(id);const prev=i.sheet;i.sheet=v;if(v==="Fixed"||v==="Fixed?"){i.sheetUnverified=true;if(i.state!=="Verified"&&(i.state==="Open"||i.state==="Needs information")){i.state="Retest required"}}if(i.state==="Verified"){i.sheetUnverified=false}log(i,S.actor,"Vendor / sheet status changed from "+prev+" to "+v+".");S.editing=null;updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor status updated.")},
- openCall(id){if(!can("calls.view")){toast("Access denied.");return}if(!CALLS[id]){toast("Transcript not supplied in the starter pack.");return}S.callId=id;S.sel=[];S.drawerOpen=false;S.view="S03";render()},
- openIssue(id){if(!can("issues.view")&&!can("vendor.issues.view")&&!can("compliance.view")){toast("Access denied.");return}S.issueId=id;S.drawerOpen=true;if(S.view!=="S04"){S.view="S04";render()}else{const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.innerHTML=drawerHtml(byId(id));d.classList.add("show");if(b)b.classList.add("show")}else{s04()}}},
+ openCall(id){if(!can("calls.view")||!canViewCall(S.actor,id)){toast("Access denied.");return}if(!CALLS[id]){toast("Transcript not supplied in the starter pack.");return}S.callId=id;S.sel=[];S.drawerOpen=false;S.view="S03";render()},
+ openIssue(id){const issue=byId(id);if(!issue||!canViewIssue(S.actor,issue)){toast("Access denied.");return}if(!can("issues.view")&&!can("vendor.issues.view")&&!can("compliance.view")){toast("Access denied.");return}S.issueId=id;S.drawerOpen=true;if(S.view!=="S04"){S.view="S04";render()}else{const d=document.getElementById("issuedrawer"),b=document.querySelector(".drawer-backdrop");if(d){d.innerHTML=drawerHtml(byId(id));d.classList.add("show");if(b)b.classList.add("show")}else{s04()}}},
  pick(id){const k=S.sel.indexOf(id);k<0?S.sel.push(id):S.sel.splice(k,1);s03()},
  clearSel(){S.sel=[];s03()},
  chk(a){if(!can("calls.review")){toast("Access denied.");return}const[f,v]=a.split("|");const c=S.checks[S.callId]||(S.checks[S.callId]={});c[f]=c[f]===v?undefined:v;S.reviewed[S.callId]=false;s03()},
@@ -501,7 +534,7 @@ saveSheet(id,v){if(!can("issues.triage")){toast("Access denied.");return}if(v===
  saveClose(id){const r=$("#cr").value.trim();if(!r){$("#merr").textContent="A reason is required.";return}const i=byId(id);i.state="Closed with reason";i.closeReason=r;log(i,"Priya Nair","Closed with reason after a failed retest: "+r);S.notes.push(id);closeModal();toast("Closed with reason. Rahul notified.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
  tagComp(id){if(!can("issues.triage")&&!can("compliance.record")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);i.compliance=!i.compliance;log(i,"Priya Nair",i.compliance?"Tagged as a wording issue (Disclosure / Compliance).":"Compliance tag removed.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
 assignOwner(id){if(!can("issues.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Assign owner",`<div class="form"><label>Owner<select id="ao">${["","Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option value="${s}" ${i.owner===s?"selected":""}>${s||"Unassigned"}</option>`).join("")}</select></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" onclick="A.saveAssignOwner('${id}')">Save</button>`)},
-saveAssignOwner(id){const v=document.getElementById("ao").value;const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,S.actor,"Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");closeModal();updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.");render()},
+saveAssignOwner(id){const v=document.getElementById("ao").value;const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;i.ownerId=empId(v);log(i,S.actor,"Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");closeModal();updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.");render()},
  link(a){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;const[c,p]=a.split("|"),i=byId(c);i.dupOf=p;log(i,"Priya Nair","Linked as a duplicate of "+p+". Call and reporter kept.");log(byId(p),"Priya Nair",c+" linked under this issue.");toast(c+" linked under "+p);render()},
  comp(){if(!can("compliance.record")&&!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")&&!can("compliance.record"))return;modal("Record Compliance status",`<p class="muted" style="margin-bottom:10px">The review happens outside this workspace. Record what Deepa Iyer confirmed.</p><div class="form"><label>Status<select id="cs"><option ${S.comp.status==="Pending"?"selected":""}>Pending</option><option ${S.comp.status==="Approved"?"selected":""}>Approved</option></select></label><label class="full">Note<textarea id="cn">${esc(S.comp.note)}</textarea></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveComp">Save</button>`)},
  saveComp(){S.comp={status:$("#cs").value,note:$("#cn").value.trim()};closeModal();toast("Compliance status: "+S.comp.status);render()},
@@ -515,8 +548,9 @@ saveAssignOwner(id){const v=document.getElementById("ao").value;const i=byId(id)
 function now(){return new Date().toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
 function setTriage(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);i.triage=v;log(i,"Priya Nair","Triage severity set to "+(v||"Not set")+".");if(v&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity")}fixNeeds(i);render()}
 function setCall(id,v){const i=byId(id);if(!v)return;i.call=v;log(i,S.actor,"Call ID added: "+v+".");i.missing=i.missing.filter(m=>m!=="Call ID");fixNeeds(i);render()}
-function setOwner(id,v){if(!can("issues.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,"Priya Nair","Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");render()}
-function assign(id,v){if(!can("retests.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.assign||"Unassigned";i.assign=v;if(v){i.owner=v}log(i,"Priya Nair","Retest assigned to "+(v||"nobody")+". Owner updated to "+(v||i.owner)+".");s05()}
+function setOwner(id,v){if(!can("issues.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;i.ownerId=empId(v);log(i,"Priya Nair","Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");render()}
+function assign(id,v){if(!can("retests.assign")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.assign||"Unassigned";i.assign=v;if(v){i.owner=v;i.ownerId=empId(v)}log(i,"Priya Nair","Retest assigned to "+(v||"nobody")+". Owner updated to "+(v||i.owner)+".");s05()}
+function assignCall(id,name){if(!can("calls.assign")){toast("Access denied.");return}CALL_ASSIGN[id]=name?empId(name):null;if(CALLS[id])CALLS[id].assignedTesterId=CALL_ASSIGN[id];toast("Call assignment updated.");s02()}
 function fixNeeds(i){if(!i.missing.length&&i.state==="Needs information"){i.state="Open";log(i,"Tool","All missing information supplied. State set to Open.")}}
 /* ===== Report issue ===== */
 const CATS=["Date accuracy","Payment handling","Voice quality","Conversation flow","Callback","Customer preference","Disclosure / Compliance","Other"];
