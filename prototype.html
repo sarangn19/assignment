@@ -71,7 +71,7 @@ tr.sel td{background:#f5f8ff}tr.dim td{color:#98a2b3}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
 /* S04 inline editing + drawer */
 .editable{position:relative;padding-right:18px}
-.editable .pencil{position:absolute;right:4px;top:50%;transform:translateY(-50%);opacity:0;font-size:11px;color:var(--muted);transition:opacity .12s;pointer-events:none}
+.editable .pencil{position:absolute;right:4px;top:50%;transform:translateY(-50%);opacity:.45;font-size:11px;color:var(--muted);transition:opacity .12s;pointer-events:none}
 .editable:hover .pencil{opacity:1}
 .editable select{width:100%;padding:4px 6px;border:1px solid var(--blue);border-radius:6px;background:#fff}
 .rowclick{cursor:pointer}
@@ -220,7 +220,7 @@ function s04(){
  const q=S.q.issues.toLowerCase(),f=S.q;
  const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));
  const states=["Open","Needs information","Retest required","Open · fix needed","Verified","Closed with reason"],sevs=[...new Set(ISSUES.map(i=>sev(i)).filter(Boolean)),"Not supplied"];
- $("#content").innerHTML=`<div class="head"><div><h1>Issues</h1><p class="sub">One record per problem. Edit severity, state, vendor status and owner inline. Click a title or row to open the detail drawer.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
+ $("#content").innerHTML=`<div class="head"><div><h1>Issues</h1><p class="sub">One record per problem. Click any value marked ✎ to edit it inline. Click a title or row to open the detail drawer.</p></div><button class="btn primary" data-act="report">＋ Report issue</button></div>
  <div class="panel"><div class="toolbar"><input class="field" id="iq" placeholder="Search issue or Call ID…" value="${esc(S.q.issues)}" oninput="S.q.issues=this.value;issueList();const e=document.getElementById('iq');e.focus();e.setSelectionRange(e.value.length,e.value.length)">
  <select class="field" onchange="S.q.state=this.value;issueList()"><option value="">All states</option>${states.map(s=>`<option ${f.state===s?"selected":""}>${s}</option>`).join("")}</select>
  <select class="field" onchange="S.q.sev=this.value;issueList()"><option value="">All severity</option>${sevs.map(s=>`<option ${f.sev===s?"selected":""}>${s}</option>`).join("")}</select></div>
@@ -289,6 +289,7 @@ function drawerHtml(i){
   <div class="drawer-section"><h3>Activity history</h3>
    ${i.hist.length?i.hist.map(h=>`<div class="hist"><b>${esc(h.who)}${h.at?' · '+esc(h.at):''}</b><p>${esc(h.txt)}</p></div>`).join(""):'<div class="empty">No activity recorded yet.</div>'}</div>
   <div class="drawer-section"><h3>Actions</h3><div style="display:grid;gap:8px">
+   <button class="btn soft" data-act="assignOwner" data-arg="${i.id}">Assign owner</button>
    <button class="btn soft" data-act="fix" data-arg="${i.id}">Record fix delivered (from Karthik’s email)</button>
    <button class="btn" data-act="toRetest" data-arg="${i.id}">Open in Retest workspace</button>
    <button class="btn ${canClose?"danger":"off"}" data-act="close" data-arg="${i.id}">Close with reason</button>
@@ -349,6 +350,8 @@ saveSheet(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}cons
   modal("Close with reason",`<p class="muted" style="margin-bottom:10px">The last retest failed. The failed result stays in the history and Rahul is notified.</p><div class="form"><label class="full">Reason for closing *<textarea id="cr" placeholder="Why is it acceptable to close this issue?"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn danger" data-act="saveClose" data-arg="${id}">Close issue</button>`)},
  saveClose(id){const r=$("#cr").value.trim();if(!r){$("#merr").textContent="A reason is required.";return}const i=byId(id);i.state="Closed with reason";i.closeReason=r;log(i,"Priya Nair","Closed with reason after a failed retest: "+r);S.notes.push(id);closeModal();toast("Closed with reason. Rahul notified.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
  tagComp(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);i.compliance=!i.compliance;log(i,"Priya Nair",i.compliance?"Tagged as a wording issue (Disclosure / Compliance).":"Compliance tag removed.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
+assignOwner(id){if(!need(isPriya(),"Priya Nair"))return;const i=byId(id);modal("Assign owner",`<div class="form"><label>Owner<select id="ao">${["","Priya Nair","Sameer Khan","Anjali Rao"].map(s=>`<option value="${s}" ${i.owner===s?"selected":""}>${s||"Unassigned"}</option>`).join("")}</select></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" onclick="A.saveAssignOwner('${id}')">Save</button>`)},
+saveAssignOwner(id){const v=document.getElementById("ao").value;const i=byId(id);i.owner=v;log(i,S.actor,"Owner assigned to "+(v||"Unassigned")+".");closeModal();updateIssueRow(id);if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Owner updated.");render()},
  link(a){if(!need(isPriya(),"Priya Nair"))return;const[c,p]=a.split("|"),i=byId(c);i.dupOf=p;log(i,"Priya Nair","Linked as a duplicate of "+p+". Call and reporter kept.");log(byId(p),"Priya Nair",c+" linked under this issue.");toast(c+" linked under "+p);render()},
  comp(){if(!need(isPriya(),"Priya Nair"))return;modal("Record Compliance status",`<p class="muted" style="margin-bottom:10px">The review happens outside this workspace. Record what Deepa Iyer confirmed.</p><div class="form"><label>Status<select id="cs"><option ${S.comp.status==="Pending"?"selected":""}>Pending</option><option ${S.comp.status==="Approved"?"selected":""}>Approved</option></select></label><label class="full">Note<textarea id="cn">${esc(S.comp.note)}</textarea></label></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn primary" data-act="saveComp">Save</button>`)},
  saveComp(){S.comp={status:$("#cs").value,note:$("#cn").value.trim()};closeModal();toast("Compliance status: "+S.comp.status);render()},
