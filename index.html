@@ -119,7 +119,7 @@ const CALLS={
 const SHEET_ONLY=["UAT-0149","UAT-0150","UAT-0165","UAT-0168","UAT-0171","UAT-0172"];
 const E2='Karthik (E2, 3 Nov): "#1 and #2 are fixed in today\'s build. For #4 we\'ve increased the end-of-call wait time. Please retest."';
 const row=(id,d,t,c,s,st)=>`Sheet row ${id} · ${d} · ${t} · ${c||"no Call ID"} · severity ${s||"blank"} · status ${st}`;
-const mk=(id,d,rep,call,title,sev,sheet,state,cat,hist,flags,missing)=>({id,date:d,reporter:rep,reporterId:empId(rep),call,title,severity:sev,sheet,state,category:cat,owner:rep||"",ownerId:empId(rep||""),triage:"",dupOf:null,compliance:false,build:"",retests:[],assign:"",flags:flags||[],missing:missing||[],hist:hist.map(h=>({who:h[0],txt:h[1]}))});
+const mk=(id,d,rep,call,title,sev,sheet,state,cat,hist,flags,missing)=>({id,date:d,reporter:rep,reporterId:empId(rep),call,title,severity:sev,sheet,state,category:cat,owner:rep||"",ownerId:empId(rep||""),triage:"",dupOf:null,compliance:false,build:"",retests:[],assign:"",flags:flags||[],missing:missing||[],hist:hist.map(h=>({who:h[0],txt:h[1]})),comments:[]});
 const EMP_ID={"Priya Nair":"E-PRIYA","Sameer Khan":"E-SAMEER","Anjali Rao":"E-ANJALI","Karthik":"E-KARTHIK","Deepa Iyer":"E-DEEPA","Rahul Mehta":"E-RAHUL"};
 function empId(n){return EMP_ID[n]||n}
 let ISSUES=[
@@ -155,6 +155,13 @@ function canViewCall(user,callId){
 }
 function getVisibleCalls(user){
  return [...Object.keys(CALLS),...SHEET_ONLY].filter(cid=>canViewCall(user,cid));
+}
+function canComment(user,issue){
+ if(!canViewIssue(user,issue))return false;
+ const role=roleOf(user);
+ if(role==="Vendor Representative"){const shared=new Set();S.handoffs.forEach(h=>h.exportedIds.forEach(x=>shared.add(x)));return shared.has(issue.id)}
+ if(role==="Compliance Reviewer")return !!issue.compliance;
+ return true;
 }
 function canViewIssue(user,issue){
  if(!issue)return false;
@@ -285,6 +292,10 @@ function s04(){
  <div class="drawer ${S.drawerOpen?'show':''}" id="issuedrawer">${S.drawerOpen&&S.issueId?drawerHtml(byId(S.issueId)):''}</div>`}
 function issueList(){s04()}
 function updateIssueRow(id){const i=byId(id);const old=document.querySelector('tr[data-issue="'+id+'"]');if(!old)return;const tmp=document.createElement('tbody');tmp.innerHTML=issueRowHtml(i);const nw=tmp.firstElementChild;if(nw)old.replaceWith(nw)}
+function loadComments(){try{const raw=localStorage.getItem("northstar_comments");if(!raw)return;const map=JSON.parse(raw);ISSUES.forEach(i=>{if(map[i.id])i.comments=map[i.id]});}catch(e){}}
+function saveComments(){try{const map={};ISSUES.forEach(i=>{if(i.comments&&i.comments.length)map[i.id]=i.comments});localStorage.setItem("northstar_comments",JSON.stringify(map));}catch(e){}}
+function loadHandoffs(){try{const raw=localStorage.getItem("northstar_handoffs");if(!raw)return;S.handoffs=JSON.parse(raw);}catch(e){}}
+function saveHandoffs(){try{localStorage.setItem("northstar_handoffs",JSON.stringify(S.handoffs));}catch(e){}}
 function allFilteredSelected(){const q=S.q.issues.toLowerCase(),f=S.q;const rows=ISSUES.filter(i=>(!q||(i.id+i.title+i.call).toLowerCase().includes(q))&&(!f.state||i.state===f.state)&&(!f.sev||(f.sev==="Not supplied"?!sev(i):sev(i)===f.sev)));return rows.length>0&&rows.every(i=>S.selectedIssues.has(i.id))}
 function csvEscape(v){const s=String(v??"");if(/[",\n]/.test(s))return '"' + s.replace(/"/g,'""') + '"';return s}
 function exportExcluded(i){if(i.dupOf)return true;if(["Needs information","Verified","Closed with reason"].includes(i.state))return true;if(i.state==="Retest required")return true;return false}
@@ -312,18 +323,19 @@ function generateVendorPackImpl(){
  const incEvidence=incEl?incEl.checked:true;
  const date=new Date().toISOString().slice(0,10);
  const filename="Northstar_UAT_Vendor_Issue_Pack_"+date+".csv";
- const headers=["Issue ID","Call ID","Issue Title","Issue Description","Expected Behaviour","Actual Behaviour","Severity","Category","Transcript Evidence / Line References","Post-call Evidence","Reported By","Assigned Owner","Vendor Status","Current Issue State","Retest Status","Retest Notes","Vendor Response","Build Version"];
+ const headers=["Issue ID","Call ID","Issue Title","Issue Description","Expected Behaviour","Actual Behaviour","Severity","Category","Transcript Evidence / Line References","Post-call Evidence","Reported By","Assigned Owner","Vendor Status","Current Issue State","Retest Status","Retest Notes","Vendor Response","Build Version","Vendor Comments"];
  const rows=ids.map(function(id){
   const i=byId(id);
   const ev=incEvidence?(i.evidenceLines&&i.evidenceLines.length?i.evidenceLines.join("; "):(i.call?"Not supplied":"Original transcript not supplied")):"Not supplied";
-  return [i.id,i.call||"Not supplied",i.title,"Not supplied",i.expected||"Not supplied",i.actual||"Not supplied",sev(i)||"Not supplied",i.category||"Not supplied",ev,"Not supplied",i.reporter||"Not supplied",i.owner||"Not supplied",i.sheet||"Not supplied",i.state,rtStatusOf(i),rtNotesOf(i),vendorResponseText(i),buildVersionOf(i)];
+  const vComments=(i.comments||[]).filter(c=>c.visibility==="Vendor").map(c=>c.author+": "+c.text).join(" | ")||"Not supplied";
+  return [i.id,i.call||"Not supplied",i.title,"Not supplied",i.expected||"Not supplied",i.actual||"Not supplied",sev(i)||"Not supplied",i.category||"Not supplied",ev,"Not supplied",i.reporter||"Not supplied",i.owner||"Not supplied",i.sheet||"Not supplied",i.state,rtStatusOf(i),rtNotesOf(i),vendorResponseText(i),buildVersionOf(i),vComments];
  });
  const csv=headers.map(csvEscape).join(",")+"\n"+rows.map(function(r){return r.map(csvEscape).join(",")}).join("\n");
  const blob=new Blob([csv],{type:"text/csv"});
  const url=URL.createObjectURL(blob);
  const handoffId="HO-"+String(S.handoffs.length+1).padStart(3,"0");
  const preparedAt=now();
- S.handoffs.push({id:handoffId,exportedIds:ids,recipient:"Karthik",exportedAt:preparedAt,filename:filename,status:"Prepared",sentAt:null,sentBy:null});
+ S.handoffs.push({id:handoffId,exportedIds:ids,recipient:"Karthik",exportedAt:preparedAt,filename:filename,status:"Prepared",sentAt:null,sentBy:null});saveHandoffs();
  const email="Subject: Northstar Life - UAT Issues for Resolution\n\nHi Karthik,\n\nPlease find attached the latest Northstar Life UAT issue report.\n\nThe report contains the issues reviewed by our team that require vendor investigation and resolution.\n\nSelected issues ("+ids.length+"): "+ids.join(", ")+".\n\nPlease review each issue and share:\n\n- Root cause, where identified.\n- Resolution status.\n- Fixed build/version details.\n- Any issues that require additional information from our team.\n\nOnce the updated build is available, we will coordinate retesting and share the results.\n\nPlease ensure that each issue is addressed individually so we can track its resolution.\n\nRegards,\nPriya Nair\nUAT Coordinator\nNorthstar Life";
  S.exportState={ids:ids,filename:filename,csvUrl:url,email:email,handoffId:handoffId,preparedAt:preparedAt};
  const bodyHtml="<div class=\"flag ok\">Vendor issue pack generated successfully.</div><p class=\"muted\" style=\"margin-bottom:10px\">"+ids.length+" issue(s) exported: "+ids.join(", ")+"</p><div class=\"kv\"><span>File</span><b>"+filename+"</b></div><div class=\"kv\"><span>Handoff ID</span><b>"+handoffId+"</b></div><div class=\"kv\"><span>Status</span><b>Prepared</b></div><div style=\"margin-top:12px;display:grid;gap:8px\"><button class=\"btn primary\" onclick=\"downloadExportCsv()\">Download Issue Report (CSV)</button><button class=\"btn\" onclick=\"downloadEmailDraft()\">Download Email Draft</button><button class=\"btn\" onclick=\"copyEmailDraft()\">Copy Email</button><button class=\"btn danger\" data-act=\"markSent\">Mark as Sent</button></div><p class=\"muted\" style=\"margin-top:10px;font-size:12px\">Priya must attach the CSV manually when sending the email. Mark as Sent only after the email is actually sent.</p>";
@@ -332,7 +344,7 @@ function generateVendorPackImpl(){
 function downloadExportCsv(){if(!S.exportState)return;const a=document.createElement("a");a.href=S.exportState.csvUrl;a.download=S.exportState.filename;a.click();toast("CSV downloaded.")}
 function downloadEmailDraft(){if(!S.exportState)return;const blob=new Blob([S.exportState.email],{type:"text/plain"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="Northstar_UAT_Vendor_Email_Draft_"+new Date().toISOString().slice(0,10)+".txt";a.click();URL.revokeObjectURL(url);toast("Email draft downloaded.")}
 function copyEmailDraft(){if(!S.exportState)return;navigator.clipboard.writeText(S.exportState.email).then(function(){toast("Email copied to clipboard.")}).catch(function(){toast("Copy failed; select the text manually.")})}
-function markSentImpl(){if(!S.exportState)return;if(!confirm("Confirm that you have manually sent the email to Karthik?"))return;const ho=S.handoffs.find(function(h){return h.id===S.exportState.handoffId});if(ho){ho.status="Sent";ho.sentAt=now();ho.sentBy=S.actor}S.exportState.status="Sent";toast("Handoff marked as Sent.");modal("Vendor Pack Sent","<div class=\"flag ok\">Handoff "+S.exportState.handoffId+" marked as Sent.</div><p class=\"muted\">Priya manually sent the email outside the application.</p>","<button class=\"btn\" data-act=\"closeModal\">Close</button>")}
+function markSentImpl(){if(!S.exportState)return;if(!confirm("Confirm that you have manually sent the email to Karthik?"))return;const ho=S.handoffs.find(function(h){return h.id===S.exportState.handoffId});if(ho){ho.status="Sent";ho.sentAt=now();ho.sentBy=S.actor}S.exportState.status="Sent";saveHandoffs();toast("Handoff marked as Sent.");modal("Vendor Pack Sent","<div class=\"flag ok\">Handoff "+S.exportState.handoffId+" marked as Sent.</div><p class=\"muted\">Priya manually sent the email outside the application.</p>","<button class=\"btn\" data-act=\"closeModal\">Close</button>")}
 function issueRowHtml(i){
  const editing=S.editing&&S.editing.id===i.id?S.editing.field:null;
  const sevVal=sev(i)||"Not supplied";
@@ -400,6 +412,10 @@ function drawerHtml(i){
    <div class="drawer-kv"><span>Build tested</span><b>${esc(lastRt?lastRt.build:(i.build||"Not recorded"))}</b></div>
    <div class="drawer-kv"><span>Retest notes</span><span>${esc(lastRt?lastRt.notes:"Not supplied")}</span></div>
    <div class="drawer-kv"><span>Retest history</span><span>${i.retests.length?i.retests.map(r=>esc(r.outcome+" on "+r.build+" by "+r.tester+" ("+r.at+")")).join("; "):'No retest recorded yet.'}</span></div></div>
+  <div class="drawer-section"><h3>Comments & Activity</h3>
+   <div style="margin-bottom:10px">${i.comments&&i.comments.length?i.comments.filter(c=>roleOf(S.actor)!=="Vendor Representative"||c.visibility==="Vendor").map(c=>`<div class="cmp" style="margin:6px 0"><div class="ph" style="margin:0"><b>${esc(c.author)}</b> <span class="tag ${c.visibility==="Vendor"?"t-blue":"t-warn"}">${c.visibility}</span> <small class="muted">${esc(c.role)} - ${esc(c.createdAt)}</small></div><p style="margin:6px 0;white-space:pre-wrap">${esc(c.text)}</p></div>`).join(""):'<div class="empty">No comments yet.</div>'}</div>
+   ${canComment(S.actor,i)?`<div class="form"><label class="full">Add comment<textarea id="commentText" placeholder="Write a comment..."></textarea></label><label>Visibility<select id="commentVis">${roleOf(S.actor)==="Vendor Representative"?'<option>Vendor</option>':'<option>Internal</option><option>Vendor</option>'}</select></label></div><div style="margin-top:8px"><button class="btn primary" data-act="postComment" data-arg="${i.id}">Post Comment</button></div>`:'<p class="muted">You do not have permission to comment on this issue.</p>'}
+  </div>
   <div class="drawer-section"><h3>Activity history</h3>
    ${i.hist.length?i.hist.map(h=>`<div class="hist"><b>${esc(h.who)}${h.at?' · '+esc(h.at):''}</b><p>${esc(h.txt)}</p></div>`).join(""):'<div class="empty">No activity recorded yet.</div>'}</div>
   <div class="drawer-section"><h3>Actions</h3><div style="display:grid;gap:8px">
@@ -497,8 +513,7 @@ generateVendorPack(){generateVendorPackImpl()},
 markSent(){markSentImpl()},
 recordVendorResponse(id){if(!can("vendor.response")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")&&!can("vendor.response"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
 saveVendorResponse(id){const i=byId(id);const status=document.getElementById("vr_status").value;const build=document.getElementById("vr_build").value.trim();const comments=document.getElementById("vr_comments").value.trim();i.vendorResponse={status:status,build:build,comments:comments,updatedBy:S.actor,updatedAt:now()};if(build)i.build=build;log(i,S.actor,"Vendor response recorded: "+status+(build?" (build "+build+")":"")+". "+comments);closeModal();if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor response recorded.");render()},
-recordVendorResponse(id){if(!can("vendor.response")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair")&&!can("vendor.response"))return;const i=byId(id);modal("Record vendor response","<div class=\"form\"><label>Response status<select id=\"vr_status\"><option>Open</option><option>In progress</option><option>Fixed</option><option>Cannot reproduce</option><option>Needs information</option></select></label><label>Build version<input id=\"vr_build\" value=\""+esc(i.build||"")+"\"></label><label class=\"full\">Vendor comments<textarea id=\"vr_comments\">"+esc(i.vendorResponse?i.vendorResponse.comments:"")+"</textarea></label></div>","<button class=\"btn\" data-act=\"closeModal\">Cancel</button><button class=\"btn primary\" onclick=\"A.saveVendorResponse('"+id+"')\">Save</button>")},
-saveVendorResponse(id){const i=byId(id);const status=document.getElementById("vr_status").value;const build=document.getElementById("vr_build").value.trim();const comments=document.getElementById("vr_comments").value.trim();i.vendorResponse={status:status,build:build,comments:comments,updatedBy:S.actor,updatedAt:now()};if(build)i.build=build;log(i,S.actor,"Vendor response recorded: "+status+(build?" (build "+build+")":"")+". "+comments);closeModal();if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Vendor response recorded.");render()},
+postComment(id){const i=byId(id);if(!canComment(S.actor,i)){toast("Access denied.");return}const text=document.getElementById("commentText").value.trim();if(!text){toast("Comment cannot be empty.");return}const vis=document.getElementById("commentVis")?document.getElementById("commentVis").value:"Internal";i.comments=i.comments||[];i.comments.push({author:S.actor,role:roleOf(S.actor),text:text,visibility:vis,createdAt:now()});saveComments();if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}toast("Comment posted.");render()},
 editSeverity(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"severity"};updateIssueRow(id)},
 editState(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"state"};updateIssueRow(id)},
 editSheet(id){if(!can("issues.triage")){toast("Access denied.");return}if(!need(isPriya(),"Priya Nair"))return;S.editing={id,field:"sheet"};updateIssueRow(id)},
@@ -589,5 +604,5 @@ $("#mbg").onclick=e=>{if(e.target.id==="mbg")closeModal()};
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(S.drawerOpen){A.closeDrawer();return}closeModal();return}if(e.key!=="Enter"&&e.key!==" ")return;const b=e.target.closest("[data-act]");if(!b||b.classList.contains("off")&&b.dataset.act!=="reviewed"&&b.dataset.act!=="close")return;e.preventDefault();const f=A[b.dataset.act];if(f)f(b.dataset.arg)});
-render();
+loadComments();loadHandoffs();render();
 </script></body></html>
