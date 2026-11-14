@@ -134,7 +134,7 @@ mk("F10","4-Nov","Anjali Rao","UAT-0172","Agent didn't capture 'don't call again
 ];
 /* ===== State ===== */
 const PEOPLE=["Priya Nair","Sameer Khan","Anjali Rao","Rahul Mehta","Deepa Iyer"];
-const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,drawerOpen:false,editing:null,rt:null,sel:[],selectedIssues:new Set(),exportState:null,handoffs:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
+const S={actor:"Priya Nair",view:"S01",callId:null,issueId:null,drawerOpen:false,editing:null,rt:null,rtSaving:false,sel:[],selectedIssues:new Set(),exportState:null,handoffs:[],comp:{status:"Pending",note:""},rec:null,dec:null,notes:[],q:{calls:"",issues:"",state:"",sev:""},checks:{},reviewed:{}};
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const slug=s=>String(s).toLowerCase().replace(/[^a-z]+/g,"-").replace(/-$/,"");
 const stag=s=>`<span class="tag t-${slug(s)}">${esc(s)}</span>`;
@@ -362,15 +362,29 @@ function drawerHtml(i){
 function s05(){
  const q=ISSUES.filter(i=>i.state==="Retest required"),cur=byId(S.rt)&&byId(S.rt).state==="Retest required"?byId(S.rt):null;
  $("#content").innerHTML=`<div class="head"><div><h1>Retest workspace</h1><p class="sub">A retest is recorded against a named build. Pass is the only route to Verified.</p></div></div>
- <div class="cols"><section><div class="panel"><h2 style="margin-bottom:8px">Awaiting retest</h2>${q.length?`<div class="tablewrap"><table style="min-width:420px"><thead><tr><th>Issue</th><th>Build</th><th>Assigned tester</th></tr></thead><tbody>${q.map(i=>`<tr class="${cur&&cur.id===i.id?"sel":""}"><td><button class="link" data-act="rt" data-arg="${i.id}">${i.id} · ${esc(i.title)}</button></td><td>${esc(i.build||"Not recorded")}</td><td><select onchange="assign('${i.id}',this.value)"><option value="">Unassigned</option>${["Sameer Khan","Anjali Rao","Priya Nair"].map(s=>`<option ${i.assign===s?"selected":""}>${s}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">No issues awaiting retest. Record a fix delivered on an issue first.</div>'}</div></section>
- <section>${cur?`<div class="panel"><div class="ph"><h2>${cur.id} · ${esc(cur.title)}</h2>${stag(cur.state)}</div>
-  <div class="kv"><span>Original evidence</span><span>${esc(cur.call||"No Call ID")} · ${esc(cur.hist[0].txt)}</span></div>
+ <div class="cols"><section><div class="panel"><h2 style="margin-bottom:8px">Awaiting retest</h2>${q.length?`<div class="tablewrap"><table style="min-width:520px"><thead><tr><th>Issue</th><th>Build</th><th>State</th><th>Retest history</th><th>Assigned tester</th></tr></thead><tbody>${q.map(i=>`<tr class="${cur&&cur.id===i.id?"sel":""}"><td><button class="link" data-act="rt" data-arg="${i.id}">${i.id} - ${esc(i.title)}</button></td><td>${esc(i.build||"Not recorded")}</td><td>${stag(i.state)}</td><td>${i.retests.length? (i.retests[i.retests.length-1].outcome==="Fail"?"<span class=\"tag t-bad\">Failed</span>":i.retests[i.retests.length-1].outcome==="Blocked"?"<span class=\"tag t-warn\">Blocked</span>":"<span class=\"tag t-ok\">"+i.retests[i.retests.length-1].outcome+"</span>") :'<span class="tag">Not recorded</span>'}</td><td><select onchange="assign('${i.id}',this.value)"><option value="">Unassigned</option>${["Sameer Khan","Anjali Rao","Priya Nair"].map(s=>`<option ${i.assign===s?"selected":""}>${s}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">No issues awaiting retest. Record a fix delivered on an issue first.</div>'}</div></section>
+ <section>${cur?`<div class="panel"><div class="ph"><h2>${cur.id} - ${esc(cur.title)}</h2>${stag(cur.state)}</div>
   <div class="kv"><span>Assigned tester</span><b>${esc(cur.assign||"Unassigned")}</b></div>
-  <div class="form" style="margin-top:12px"><label>Build tested *<input id="rb" placeholder="Build identifier" value="${esc(cur.build)}"></label><label>Outcome<select id="ro"><option>Pass</option><option>Fail</option><option>Blocked</option></select></label>
-  <label class="full">Scenario repeated<textarea id="rs" placeholder="Which call or scenario did you repeat?">${cur.call?"Repeat of "+cur.call+": "+cur.title:""}</textarea></label>
-  <label>Expected result<textarea id="re"></textarea></label><label>Actual result<textarea id="ra"></textarea></label><label class="full">Notes *<textarea id="rn"></textarea></label></div>
-  <div class="err" id="rerr"></div><div style="margin-top:10px"><button class="btn primary" data-act="saveRt" data-arg="${cur.id}">Submit retest result</button></div></div>
-  <div class="panel"><h2 style="margin-bottom:8px">Result history</h2>${cur.retests.length?cur.retests.map(r=>`<div class="row"><span><b>${r.outcome}</b> on build ${esc(r.build)}<br><small class="muted">${esc(r.tester)} · ${esc(r.at)} · ${esc(r.notes)}</small></span></div>`).join(""):'<div class="empty">No results yet.</div>'}</div>`:'<div class="empty">Select an issue to record a retest result.</div>'}</section></div>`}
+  <details class="panel" style="margin:8px 0"><summary style="cursor:pointer;font-weight:650">Original issue evidence</summary>
+   <div class="kv"><span>Issue ID / title</span><b>${cur.id} - ${esc(cur.title)}</b></div>
+   <div class="kv"><span>Original Call ID</span><span>${cur.call?esc(cur.call):'Transcript not supplied'}</span></div>
+   <div class="kv"><span>Original description</span><span>${esc(cur.title)}</span></div>
+   <div class="kv"><span>Transcript evidence</span><span>${cur.evidenceLines&&cur.evidenceLines.length?esc(cur.evidenceLines.join(", ")):(cur.call?'Not recorded':'Transcript not supplied')}</span></div>
+   <div class="kv"><span>Post-call evidence</span><span>${cur.call?'See call detail comparison (S03)':'Transcript not supplied'}</span></div>
+   <div class="kv"><span>Expected behaviour</span><span>${esc(cur.expected||"Not supplied")}</span></div>
+  </details>
+  <div class="form" style="margin-top:12px">
+   <label>Build tested *<input id="rb" placeholder="Build identifier" value="${esc(cur.build)}"></label>
+   <label>Outcome *<select id="ro"><option value="">Select outcome</option><option>Pass</option><option>Fail</option><option>Blocked</option></select></label>
+   <label class="full">Scenario repeated<textarea id="rs" placeholder="Which call or scenario did you repeat?">${cur.call?"Repeat of "+cur.call+": "+cur.title:""}</textarea></label>
+   <label>Expected result *<textarea id="re" placeholder="What should happen"></textarea></label>
+   <label>Actual result *<textarea id="ra" placeholder="What happened"></textarea></label>
+   <label class="full">Notes *<textarea id="rn" placeholder="Observations / blocked reason"></textarea></label>
+  </div>
+  <div class="err" id="rerr"></div>
+  <div style="margin-top:10px"><button class="btn primary" data-act="saveRt" data-arg="${cur.id}">Submit retest result</button></div>
+ </div>
+ <div class="panel"><h2 style="margin-bottom:8px">Retest history</h2>${cur.retests.length?cur.retests.map((r,idx)=>`<div class="row" style="display:block"><b>Attempt ${idx+1}: ${esc(r.outcome)}</b><br><small class="muted">Tester: ${esc(r.tester)} - Build: ${esc(r.build)} - ${esc(r.at)}</small><br><small>Expected: ${esc(r.expected||"Not supplied")}<br>Actual: ${esc(r.actual||"Not supplied")}<br>Notes: ${esc(r.notes)}</small></div>`).join(""):'<div class="empty">No results yet.</div>'}</div>`:'<div class="empty">Select an issue to record a retest result.</div>'}</section></div>`}
 /* ===== Actions ===== */
 const A={
  go(v){S.view=v;S.issueId=null;S.drawerOpen=false;render()},
@@ -409,13 +423,15 @@ saveSheet(id,v){if(v==="__cancel"){S.editing=null;updateIssueRow(id);return}cons
  saveFix(id){const b=$("#fb").value.trim();if(!b){$("#merr").textContent="Build is required.";return}const i=byId(id);i.build=b;i.state="Retest required";i.assign="";log(i,"Karthik S (recorded by Priya Nair)","Fix delivered in build "+b+". "+$("#fn").value);closeModal();toast("Fix recorded. Retest required.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
  toRetest(id){const i=byId(id);if(i.state!=="Retest required"){toast("Record a fix delivered first. Only then can it be retested.");return}S.rt=id;S.view="S05";render()},
  rt(id){S.rt=id;s05()},
- saveRt(id){const i=byId(id),b=$("#rb").value.trim(),n=$("#rn").value.trim();
-  if(!isTester()){need(false,"a tester or Priya");return}
-  if(!b||!n){$("#rerr").textContent="Result not saved: build and notes are required. Your other inputs are kept.";return}
-  const o=$("#ro").value;i.build=b;i.retests.push({outcome:o,build:b,tester:S.actor,at:now(),notes:n});
-  log(i,S.actor,"Retest on build "+b+": "+o+". "+n);
-  if(o==="Pass"){i.state="Verified";toast("Passed. Issue is Verified.")}else if(o==="Fail"){i.state="Open · fix needed";toast("Failed. Issue reopened as Open · fix needed.")}else{toast("Blocked. Issue stays in Retest required.")}
-  S.rt=null;render()},
+ saveRt(id){const i=byId(id);if(S.rtSaving)return;const b=$("#rb").value.trim(),o=$("#ro").value,sc=$("#rs").value.trim(),exp=$("#re").value.trim(),act=$("#ra").value.trim(),n=$("#rn").value.trim();
+   if(!isTester()){need(false,"a tester or Priya");return}
+   const missing=[];if(!b)missing.push("Build tested");if(!o)missing.push("Outcome");if(!act)missing.push("Actual result");if(o==="Pass"&&!exp)missing.push("Expected result");if(!n)missing.push("Notes");
+   if(missing.length){$("#rerr").textContent="Result not saved: "+missing.join(", ")+" required.";return}
+   S.rtSaving=true;const btn=document.querySelector('button[data-act="saveRt"]');if(btn)btn.disabled=true;
+   i.build=b;i.retests.push({outcome:o,build:b,tester:S.actor,at:now(),notes:n,expected:exp,actual:act,scenario:sc});
+   log(i,S.actor,"Retest on build "+b+": "+o+". "+n);
+   if(o==="Pass"){i.state="Verified";toast("Passed. Issue is Verified.")}else if(o==="Fail"){i.state="Open  ·  fix needed";toast("Failed. Issue reopened as Open / Fix needed.")}else{toast("Blocked. Issue stays in Retest required.")}
+   S.rtSaving=false;S.rt=null;render()},
  close(id){const i=byId(id);if(i.state!=="Open · fix needed"){toast("Closing with a reason is only possible after a failed retest.");return}if(!need(isPriya(),"Priya Nair"))return;
   modal("Close with reason",`<p class="muted" style="margin-bottom:10px">The last retest failed. The failed result stays in the history and Rahul is notified.</p><div class="form"><label class="full">Reason for closing *<textarea id="cr" placeholder="Why is it acceptable to close this issue?"></textarea></label></div><div class="err" id="merr"></div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn danger" data-act="saveClose" data-arg="${id}">Close issue</button>`)},
  saveClose(id){const r=$("#cr").value.trim();if(!r){$("#merr").textContent="A reason is required.";return}const i=byId(id);i.state="Closed with reason";i.closeReason=r;log(i,"Priya Nair","Closed with reason after a failed retest: "+r);S.notes.push(id);closeModal();toast("Closed with reason. Rahul notified.");if(S.drawerOpen&&S.issueId===id){const d=document.getElementById("issuedrawer");if(d)d.innerHTML=drawerHtml(i)}render()},
@@ -436,7 +452,7 @@ function now(){return new Date().toLocaleString("en-GB",{day:"numeric",month:"sh
 function setTriage(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);i.triage=v;log(i,"Priya Nair","Triage severity set to "+(v||"Not set")+".");if(v&&i.missing.includes("Severity")){i.missing=i.missing.filter(m=>m!=="Severity")}fixNeeds(i);render()}
 function setCall(id,v){const i=byId(id);if(!v)return;i.call=v;log(i,S.actor,"Call ID added: "+v+".");i.missing=i.missing.filter(m=>m!=="Call ID");fixNeeds(i);render()}
 function setOwner(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.owner||"Unassigned";i.owner=v;log(i,"Priya Nair","Owner reassigned from "+prev+" to "+(v||"Unassigned")+".");render()}
-function assign(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);i.assign=v;log(i,"Priya Nair","Retest assigned to "+(v||"nobody")+".");s05()}
+function assign(id,v){if(!need(isPriya(),"Priya Nair")){render();return}const i=byId(id);const prev=i.assign||"Unassigned";i.assign=v;if(v){i.owner=v}log(i,"Priya Nair","Retest assigned to "+(v||"nobody")+". Owner updated to "+(v||i.owner)+".");s05()}
 function fixNeeds(i){if(!i.missing.length&&i.state==="Needs information"){i.state="Open";log(i,"Tool","All missing information supplied. State set to Open.")}}
 /* ===== Report issue ===== */
 const CATS=["Date accuracy","Payment handling","Voice quality","Conversation flow","Callback","Customer preference","Disclosure / Compliance","Other"];
